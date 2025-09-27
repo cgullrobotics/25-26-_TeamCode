@@ -2,12 +2,15 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.CRServo;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="Code", group="Linear OpMode")
 
 public class TeleOp extends LinearOpMode {
-    private DcMotor leftFront,leftBack,rightFront,rightBack,intake;
+    private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret,shooter;
+    private CRServo ballTransfer;
+    private Servo angle;
     @Override
     public void runOpMode(){
         leftFront = hardwareMap.get(DcMotor.class, "leftFront");
@@ -15,6 +18,8 @@ public class TeleOp extends LinearOpMode {
         rightBack = hardwareMap.get(DcMotor.class, "rightBack");
         rightFront = hardwareMap.get(DcMotor.class, "rightFront");
         intake = hardwareMap.get(DcMotor.class, "intake");
+        ballTransfer = hardwareMap.get(CRServo.class,"ballTransfer");
+        angle = hardwareMap.get(Servo.class,"angle");
 
         leftFront.setDirection(DcMotor.Direction.REVERSE);
         leftBack.setDirection(DcMotor.Direction.REVERSE);
@@ -25,20 +30,7 @@ public class TeleOp extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()){
-
-            double x = -gamepad1.left_stick_y;
-            double y = gamepad1.left_stick_x;
-            double z = gamepad1.right_stick_x;
-
-            double leftFrontPower = x + y + z;
-            double leftBackPower = x - y + z;
-            double rightFrontPower = x - y - z;
-            double rightBackPower = x + y - z;
-
-            leftFront.setPower(leftFrontPower);
-            leftBack.setPower(leftBackPower);
-            rightFront.setPower(rightFrontPower);
-            rightBack.setPower(rightBackPower);
+            driveTrain();
 
             if (gamepad1.right_bumper){
                 intake.setPower(-1);
@@ -49,5 +41,20 @@ public class TeleOp extends LinearOpMode {
 
             telemetry.update();
         }
+    }
+    public void driveTrain(){
+        double x = -gamepad1.left_stick_y;
+        double y = gamepad1.left_stick_x;
+        double z = gamepad1.right_stick_x;
+
+        double leftFrontPower = x + y + z;
+        double leftBackPower = x - y + z;
+        double rightFrontPower = x - y - z;
+        double rightBackPower = x + y - z;
+
+        leftFront.setPower(leftFrontPower);
+        leftBack.setPower(leftBackPower);
+        rightFront.setPower(rightFrontPower);
+        rightBack.setPower(rightBackPower);
     }
 }
