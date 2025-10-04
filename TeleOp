@@ -6,7 +6,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
 
-@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="Code", group="Linear OpMode")
+@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp", group="Linear OpMode")
 
 public class TeleOp extends LinearOpMode {
     private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret,shooter;
