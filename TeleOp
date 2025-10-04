@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
 
@@ -36,6 +35,7 @@ public class TeleOp extends LinearOpMode {
             driveTrain();
             intakeControl();
             turretControl();
+            angleManualOverride();
             turretManualOverride();
             telemetry.addData("leftFront Position",leftFront.getCurrentPosition());
             telemetry.addData("leftBack Position",leftBack.getCurrentPosition());
@@ -70,9 +70,9 @@ public class TeleOp extends LinearOpMode {
         }
     }
     public void turretControl(){
-        
+
     }
-    public void angleControl(){
+    public void angleManualOverride(){
         if (gamepad2.dpad_up){
             angle.setPosition(angle.getPosition()+1);
         }
