@@ -1,3 +1,4 @@
+
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -9,6 +10,10 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.LLStatus;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
+import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp", group="Linear OpMode")
 
@@ -49,6 +54,7 @@ public class TeleOp extends LinearOpMode {
             turretControl();
             angleManualOverride();
             turretManualOverride();
+            shooterControl();
             telemetry.addData("leftFront Position",leftFront.getCurrentPosition());
             telemetry.addData("leftBack Position",leftBack.getCurrentPosition());
             telemetry.addData("rightFront Position",rightFront.getCurrentPosition());
@@ -81,6 +87,9 @@ public class TeleOp extends LinearOpMode {
             ballTransfer.setPower(0);
         }
     }
+    public void shooterControl(){
+        shooter.setPower(gamepad1.right_trigger * 0.75);
+    }
     public void turretControl(){
         LLResult result = limelight.getLatestResult();
         double tx = 0;
@@ -89,11 +98,11 @@ public class TeleOp extends LinearOpMode {
             tx = result.getTx();
             double ty = result.getTy();
             ta = result.getTa();
-            
+
             telemetry.addData("Target X", tx);
             telemetry.addData("Target Y", ty);
             telemetry.addData("Target Area", ta);
-            
+
         } else {
             telemetry.addData("limelight","No targets");
         }
@@ -109,7 +118,7 @@ public class TeleOp extends LinearOpMode {
         telemetry.addData("tx", tx);
         telemetry.addData("ta",ta);
         telemetry.addData("turnpower", turnPower);
-        
+
     }
     public void angleManualOverride(){
         if (gamepad2.dpad_up){
