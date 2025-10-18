@@ -61,7 +61,6 @@ public class TeleOp extends LinearOpMode {
         waitForStart();
 
         while (opModeIsActive()){
-            driveTrain();
             fieldCentricDriveTrain();
             intakeControl();
             turretControl();
@@ -77,21 +76,6 @@ public class TeleOp extends LinearOpMode {
             telemetry.update();
             odo.update();
         }
-    }
-    public void driveTrain(){
-        double x = -gamepad1.left_stick_y;
-        double y = gamepad1.left_stick_x;
-        double z = gamepad1.right_stick_x;
-
-        double leftFrontPower = x + y + z;
-        double leftBackPower = x - y + z;
-        double rightFrontPower = x - y - z;
-        double rightBackPower = x + y - z;
-
-        leftFront.setPower(leftFrontPower);
-        leftBack.setPower(leftBackPower);
-        rightFront.setPower(rightFrontPower);
-        rightBack.setPower(rightBackPower);
     }
     public void fieldCentricDriveTrain(){
         double forward = -gamepad1.left_stick_y;
