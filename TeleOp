@@ -1,8 +1,8 @@
-
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.hardware.limelightvision.LLResult;
@@ -10,10 +10,6 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.LLStatus;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
-import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp", group="Linear OpMode")
 
@@ -29,9 +25,12 @@ public class TeleOp extends LinearOpMode {
         rightBack = hardwareMap.get(DcMotor.class, "rightBack");
         rightFront = hardwareMap.get(DcMotor.class, "rightFront");
         intake = hardwareMap.get(DcMotor.class, "intake");
+        shooter = hardwareMap.get(DcMotor.class, "shooter");
+        turret = hardwareMap.get(DcMotor.class, "turret");
         ballTransfer = hardwareMap.get(CRServo.class,"ballTransfer");
         angle = hardwareMap.get(Servo.class,"angle");
         limelight = hardwareMap.get(Limelight3A.class,"limelight");
+
         limelight.setPollRateHz(100);
         limelight.pipelineSwitch(0);
         limelight.start();
@@ -59,6 +58,7 @@ public class TeleOp extends LinearOpMode {
             telemetry.addData("leftBack Position",leftBack.getCurrentPosition());
             telemetry.addData("rightFront Position",rightFront.getCurrentPosition());
             telemetry.addData("rightBack Position",rightBack.getCurrentPosition());
+            telemetry.addData("Shooter Power", shooter.getPower());
             telemetry.update();
         }
     }
