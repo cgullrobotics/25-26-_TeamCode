@@ -1,0 +1,282 @@
+package org.firstinspires.ftc.teamcode;
+import static org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.hardwareMap;
+
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
+import com.qualcomm.hardware.limelightvision.LLStatus;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+
+@Autonomous(name="Auto_Blue")
+
+public class Auto_Blue extends LinearOpMode {
+    private DcMotor leftFront, intake, leftback, rightFront, rightBack, shooter, turret;
+    private double kP, kI, kD;
+    private double integral, previousError;
+    Limelight3A limelight3A;
+
+    public int StateCounter = 1;
+
+
+    @Override
+    public void runOpMode() throws InterruptedException {
+        leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        leftback = hardwareMap.get(DcMotor.class, "leftBack");
+        rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        rightBack = hardwareMap.get(DcMotor.class, "rightBack");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+        shooter = hardwareMap.get(DcMotor.class,"shooter");
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        leftback.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        limelight3A = hardwareMap.get(Limelight3A.class,"limelight 3A");
+        limelight3A.setPollRateHz(100); // This sets how often we ask Limelight for data (100 times per second)
+        limelight3A.start(); // This tells Limelight to start looking!
+        limelight3A.pipelineSwitch(0);
+        waitForStart();
+        while (opModeIsActive()) {
+            telemetry.update();
+            telemetry.addData("leftfront",leftFront.getCurrentPosition());
+            telemetry.addData("rightfront",rightFront.getCurrentPosition());
+            telemetry.addData("leftback",leftback.getCurrentPosition());
+            telemetry.addData("rightback",rightBack.getCurrentPosition());
+            LLResult result = limelight3A.getLatestResult();
+            double tx = 0;
+            double ta = 0;
+            if (result != null && result.isValid()) {
+                tx = result.getTx();
+                double ty = result.getTy(); // How far up or down the target is (degrees)
+                ta = result.getTa();
+
+                telemetry.addData("Target X", tx);
+                telemetry.addData("Target Y", ty);
+                telemetry.addData("Target Area", ta);
+            } else {
+                telemetry.addData("Limelight", "No Targets");
+            }
+
+            // Proportional control for alignment
+            double kP = 1; // Tuning constant for turning
+            double turnPower = kP * tx;
+
+            // Stop condition: If the target is centered and close enough
+            if (Math.abs(tx) > 3.30 && ta < .33) {
+                turret.setPower(0);
+
+                telemetry.addData("Status", "Aligned!");
+                telemetry.update();
+
+            }else {
+
+            // Adjust motors to align with the target
+            turret.setPower(-turnPower);
+            shooter.setPower(.75);
+
+            telemetry.update();
+            telemetry.addData("tx", tx);
+            telemetry.addData("ta", ta);
+            telemetry.addData("turnPower",turnPower);}
+            switch (StateCounter) {
+
+
+                case 1: {
+
+                    wait(5);
+                    leftFront.setTargetPosition(255);
+                    leftback.setTargetPosition(-2431);
+                    rightFront.setTargetPosition(2411);
+                    rightBack.setTargetPosition(-266);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(1);
+                    leftback.setPower(1);
+                    rightFront.setPower(-1);
+                    rightBack.setPower(-1);
+
+
+                    sleep(1500);
+                    StateCounter = 2;
+
+
+                    break;
+                }
+                case 2: {
+                    intake.setPower(1);
+
+                    leftFront.setTargetPosition(-531);
+                    leftback.setTargetPosition(-3239);
+                    rightFront.setTargetPosition(3234);
+                    rightBack.setTargetPosition(522);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(.32);
+                    leftback.setPower(.32);
+                    rightFront.setPower(-.32);
+                    rightBack.setPower(-.32);
+
+
+
+
+                    sleep(1500);
+                    StateCounter = 3;
+                    break;
+
+                }
+                case 3: {
+                    intake.setPower(0);
+                    leftFront.setTargetPosition(101);
+                    leftback.setTargetPosition(-758);
+                    rightFront.setTargetPosition(693);
+                    rightBack.setTargetPosition(-204);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(-.8);
+                    leftback.setPower(-.8);
+                    rightFront.setPower(.8);
+                    rightBack.setPower(.8);
+
+
+                    sleep(3000);
+                    leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    leftback.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    rightBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    StateCounter = 4;
+                    break;
+                }
+                case 4: {
+                    leftFront.setTargetPosition(878);
+                    leftback.setTargetPosition(-2667);
+                    rightFront.setTargetPosition(2610);
+                    rightBack.setTargetPosition(-793);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(.8);
+                    leftback.setPower(.8);
+                    rightFront.setPower(-.8);
+                    rightBack.setPower(-.8);
+
+
+                    sleep(3000);
+                    StateCounter = 5;
+                    break;
+                }
+                case 5: {
+                    intake.setPower(1);
+                    leftFront.setTargetPosition(-6);
+                    leftback.setTargetPosition(-3614);
+                    rightFront.setTargetPosition(3544);
+                    rightBack.setTargetPosition(73);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(.3);
+                    leftback.setPower(.3);
+                    rightFront.setPower(-.3);
+                    rightBack.setPower(-.3);
+
+
+
+                    sleep(1500);
+                    StateCounter = 6;
+
+                }
+                case 6: {
+                    intake.setPower(0);
+                    leftFront.setTargetPosition(699);
+                    leftback.setTargetPosition(-1109);
+                    rightFront.setTargetPosition(1389);
+                    rightBack.setTargetPosition(-1229);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(1);
+                    leftback.setPower(1);
+                    rightFront.setPower(-1);
+                    rightBack.setPower(-1);
+
+
+
+                    sleep(5000);
+                    StateCounter = 0;
+                }
+                case 7: {
+
+                    leftFront.setTargetPosition(-49);
+                    leftback.setTargetPosition(-2581);
+                    rightFront.setTargetPosition(2854);
+                    rightBack.setTargetPosition(-494);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(1);
+                    leftback.setPower(1);
+                    rightFront.setPower(-1);
+                    rightBack.setPower(-1);
+
+
+                    sleep(3000);
+                    StateCounter = 0;
+                }
+                case 8:{
+                    intake.setPower(1);
+                    leftFront.setTargetPosition(-1496);
+                    leftback.setTargetPosition(-2239);
+                    rightFront.setTargetPosition(2306);
+                    rightBack.setTargetPosition(1515);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(.3);
+                    leftback.setPower(.3);
+                    rightFront.setPower(-.3);
+                    rightBack.setPower(-.3);
+                    sleep(1000);
+                    intake.setPower(0);
+                    sleep(1500);
+                    StateCounter = 0;
+
+                }
+                case  9:{
+                    leftFront.setTargetPosition(-156);
+                    leftback.setTargetPosition(-948);
+                    rightFront.setTargetPosition(940);
+                    rightBack.setTargetPosition(135);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(1);
+                    leftback.setPower(1);
+                    rightFront.setPower(-1);
+                    rightBack.setPower(-1);
+
+                }
+            }
+
+        }
+    }
+}
+
