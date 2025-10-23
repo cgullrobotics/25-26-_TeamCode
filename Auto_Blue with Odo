@@ -1,0 +1,203 @@
+package org.firstinspires.ftc.teamcode;
+import static org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.hardwareMap;
+
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
+import com.qualcomm.hardware.limelightvision.LLStatus;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
+
+@Autonomous(name="Auto_Blue")
+
+public class Auto_With_Odo extends LinearOpMode {
+    private DcMotor leftFront, intake, leftBack, rightFront, rightBack, shooter, turret;
+    Limelight3A limelight3A;
+    public int StateCounter = 1;
+    GoBildaPinpointDriver pinpoint;
+
+    @Override
+    public void runOpMode() throws InterruptedException {
+        leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        leftBack = hardwareMap.get(DcMotor.class, "leftBack");
+        rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        rightBack = hardwareMap.get(DcMotor.class, "rightBack");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+        shooter = hardwareMap.get(DcMotor.class, "shooter");
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        leftBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        limelight3A = hardwareMap.get(Limelight3A.class, "limelight 3A");
+        limelight3A.setPollRateHz(100); // This sets how often we ask Limelight for data (100 times per second)
+        limelight3A.start(); // This tells Limelight to start looking!
+        limelight3A.pipelineSwitch(0);
+
+        pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+        pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        pinpoint.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.FORWARD);
+        pinpoint.update();
+        waitForStart();
+        while (opModeIsActive()) {
+            limeLightStuff();
+
+            step1(10,0,0,0.5);
+            step2(0,10,0,0.5);
+            step3(0,0,90,0.5);
+
+            telemetry.update();
+            telemetry.addData("leftfront", leftFront.getCurrentPosition());
+            telemetry.addData("rightfront", rightFront.getCurrentPosition());
+            telemetry.addData("leftback", leftBack.getCurrentPosition());
+            telemetry.addData("rightback", rightBack.getCurrentPosition());
+
+        }
+    }
+    public void limeLightStuff(){
+        LLResult result = limelight3A.getLatestResult();
+        double tx = 0;
+        double ta = 0;
+        if (result != null && result.isValid()) {
+            tx = result.getTx();
+            double ty = result.getTy(); // How far up or down the target is (degrees)
+            ta = result.getTa();
+
+            telemetry.addData("Target X", tx);
+            telemetry.addData("Target Y", ty);
+            telemetry.addData("Target Area", ta);
+        } else {
+            telemetry.addData("Limelight", "No Targets");
+        }
+
+        // Proportional control for alignment
+        double kP = 1; // Tuning constant for turning
+        double turnPower = kP * tx;
+
+        // Stop condition: If the target is centered and close enough
+        if (Math.abs(tx) > 3.30 && ta < .33) {
+            turret.setPower(0);
+
+            telemetry.addData("Status", "Aligned!");
+            telemetry.update();
+
+        } else {
+
+            // Adjust motors to align with the target
+            turret.setPower(-turnPower);
+            shooter.setPower(.75);
+
+            telemetry.update();
+            telemetry.addData("tx", tx);
+            telemetry.addData("ta", ta);
+            telemetry.addData("turnPower", turnPower);
+        }
+    }
+    private void step1(double targetX, double targetY, double targetHeading, double power){
+        while (opModeIsActive()) {
+            Pose2D pose = pinpoint.getPosition();
+            double x = pose.getX(DistanceUnit.INCH);
+            double y = pose.getY(DistanceUnit.INCH);
+            double heading = pose.getHeading(AngleUnit.DEGREES);
+            double error = targetX - x;
+            telemetry.addData("Step", "1");
+            telemetry.addData("Current X", x);
+            telemetry.addData("Current Y", y);
+            telemetry.addData("Heading", heading);
+            telemetry.addData("Power", power);
+            telemetry.addData("Error", error);
+            telemetry.update();
+            if (Math.abs(error) < 10) break;
+
+            double direction = Math.signum(error);
+            setAllDrivePower(power * direction);
+        }
+
+    }
+    private void step2(double targetX, double targetY, double targetHeading, double power){
+        while (opModeIsActive()) {
+            Pose2D pose = pinpoint.getPosition();
+            double x = pose.getX(DistanceUnit.INCH);
+            double y = pose.getY(DistanceUnit.INCH);
+            double heading = pose.getHeading(AngleUnit.DEGREES);
+            double error = targetY - y;
+            telemetry.addData("Step", "2");
+            telemetry.addData("Current X", x);
+            telemetry.addData("Current Y", y);
+            telemetry.addData("Heading", heading);
+            telemetry.addData("Power", power);
+            telemetry.addData("Error", error);
+            telemetry.update();
+            if (Math.abs(error) < 10) break;
+
+            double direction = Math.signum(error);
+            setStrafePower(power * direction);
+        }
+
+    }
+    private void step3(double targetX, double targetY, double targetHeading, double power){
+        while (opModeIsActive()) {
+            Pose2D pose = pinpoint.getPosition();
+            double x = pose.getX(DistanceUnit.INCH);
+            double y = pose.getY(DistanceUnit.INCH);
+            double heading = pose.getHeading(AngleUnit.DEGREES);
+            double error = targetHeading - heading;
+            error = normalizeAngle(error);
+            telemetry.addData("Step", "3");
+            telemetry.addData("Current X", x);
+            telemetry.addData("Current Y", y);
+            telemetry.addData("Heading", heading);
+            telemetry.addData("Target X",targetX);
+            telemetry.addData("Target Y",targetY);
+            telemetry.addData("Target Heading",targetHeading);
+            telemetry.addData("Power", power);
+            telemetry.addData("Error", error);
+            telemetry.update();
+            if (Math.abs(error) < Math.toRadians(2)) break;
+
+            double direction = Math.signum(error);
+            setTurnPower(power * direction);
+        }
+        stopMotors();
+    }
+    private void setAllDrivePower(double power) {
+        leftFront.setPower(power);
+        rightFront.setPower(power);
+        leftBack.setPower(power);
+        rightBack.setPower(power);
+    }
+    private void setStrafePower(double power) {
+        leftFront.setPower(power);
+        rightFront.setPower(-power);
+        leftBack.setPower(-power);
+        rightBack.setPower(power);
+    }
+    private void setTurnPower(double power) {
+        leftFront.setPower(power);
+        rightFront.setPower(-power);
+        leftBack.setPower(power);
+        rightBack.setPower(-power);
+    }
+    private void stopMotors() {
+        leftFront.setPower(0);
+        rightFront.setPower(0);
+        leftFront.setPower(0);
+        rightBack.setPower(0);
+    }
+    private double normalizeAngle(double angle) {
+        while (angle > Math.PI) angle -= 2 * Math.PI;
+        while (angle < -Math.PI) angle += 2 * Math.PI;
+        return angle;
+    }
+}
