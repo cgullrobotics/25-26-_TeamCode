@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
 
@@ -9,8 +10,9 @@ import com.qualcomm.robotcore.hardware.CRServo;
 
 public class TeleOp extends LinearOpMode {
     private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret,shooter;
-    private CRServo ballTransfer;
-    private Servo angle;
+    private CRServo ballTransfer1,ballTransfer2;
+    private Servo angle,lift2Launch;
+
     @Override
     public void runOpMode(){
         leftFront = hardwareMap.get(DcMotor.class, "leftFront");
@@ -18,15 +20,21 @@ public class TeleOp extends LinearOpMode {
         rightBack = hardwareMap.get(DcMotor.class, "rightBack");
         rightFront = hardwareMap.get(DcMotor.class, "rightFront");
         intake = hardwareMap.get(DcMotor.class, "intake");
-        ballTransfer = hardwareMap.get(CRServo.class,"ballTransfer");
+        shooter = hardwareMap.get(DcMotor.class, "shooter");
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        ballTransfer1 = hardwareMap.get(CRServo.class,"ballTransfer1");
+        ballTransfer2 = hardwareMap.get(CRServo.class,"ballTransfer2");
         angle = hardwareMap.get(Servo.class,"angle");
+        lift2Launch = hardwareMap.get(Servo.class,"lift2Launch");
+        telemetry.addData(">", "robot ready . press play");
+        telemetry.update();
 
         leftFront.setDirection(DcMotor.Direction.REVERSE);
         leftBack.setDirection(DcMotor.Direction.REVERSE);
         rightFront.setDirection(DcMotor.Direction.FORWARD);
         rightBack.setDirection(DcMotor.Direction.FORWARD);
         intake.setDirection(DcMotor.Direction.REVERSE);
-        ballTransfer.setDirection(CRServo.Direction.REVERSE);
+        ballTransfer1.setDirection(CRServo.Direction.REVERSE);
         angle.setDirection(Servo.Direction.REVERSE);
 
         waitForStart();
@@ -37,10 +45,12 @@ public class TeleOp extends LinearOpMode {
             turretControl();
             angleManualOverride();
             turretManualOverride();
+            shooterControl();
             telemetry.addData("leftFront Position",leftFront.getCurrentPosition());
             telemetry.addData("leftBack Position",leftBack.getCurrentPosition());
             telemetry.addData("rightFront Position",rightFront.getCurrentPosition());
             telemetry.addData("rightBack Position",rightBack.getCurrentPosition());
+            telemetry.addData("Shooter Power", shooter.getPower());
             telemetry.update();
         }
     }
@@ -62,15 +72,30 @@ public class TeleOp extends LinearOpMode {
     public void intakeControl(){
         if (gamepad1.right_trigger>0.5){
             intake.setPower(-1);
-            ballTransfer.setPower(1);
+            ballTransfer1.setPower(1);
+            ballTransfer2.setPower(1);
         }
         else if (gamepad1.left_trigger>0.5){
             intake.setPower(0);
-            ballTransfer.setPower(0);
+            ballTransfer1.setPower(0);
+            ballTransfer2.setPower(0);
+        }
+    }
+    public void shooterControl(){
+        if (gamepad1.right_bumper){
+            shooter.setPower(.5);
+        }
+        else if (gamepad1.left_bumper){
+            shooter.setPower(0);
+        }
+        if (gamepad2.right_trigger>0.5){
+            lift2Launch.setPosition(1);
+        }
+        else {
+            lift2Launch.setPosition(0);
         }
     }
     public void turretControl(){
-
     }
     public void angleManualOverride(){
         if (gamepad2.dpad_up){
