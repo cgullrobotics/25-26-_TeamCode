@@ -2,29 +2,26 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
-import com.qualcomm.hardware.limelightvision.LLStatus;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
+
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
-import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp", group="Linear OpMode")
 
-public class TeleOp extends LinearOpMode {
+public class TeleOpFieldCentric extends LinearOpMode {
     private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret,shooter;
     private CRServo ballTransfer;
-    private Servo angle;
+    private Servo angle,lift2Launch;
     private Limelight3A limelight;
     GoBildaPinpointDriver odo;
     @Override
     public void runOpMode(){
+
         leftFront = hardwareMap.get(DcMotor.class, "leftFront");
         leftBack = hardwareMap.get(DcMotor.class, "leftBack");
         rightBack = hardwareMap.get(DcMotor.class, "rightBack");
@@ -34,6 +31,7 @@ public class TeleOp extends LinearOpMode {
         turret = hardwareMap.get(DcMotor.class, "turret");
         ballTransfer = hardwareMap.get(CRServo.class,"ballTransfer");
         angle = hardwareMap.get(Servo.class,"angle");
+        lift2Launch = hardwareMap.get(Servo.class,"lift2Launch");
         limelight = hardwareMap.get(Limelight3A.class,"limelight");
 
         odo = hardwareMap.get(GoBildaPinpointDriver.class, "odo");
@@ -78,6 +76,8 @@ public class TeleOp extends LinearOpMode {
         }
     }
     public void fieldCentricDriveTrain(){
+        double[] newDouble = {0,0,0,0,0};
+
         double forward = -gamepad1.left_stick_y;
         double strafe = gamepad1.left_stick_x;
         double spin = gamepad1.right_stick_x;
@@ -91,7 +91,7 @@ public class TeleOp extends LinearOpMode {
         double globalStrafe = -forward * sinAngle + strafe * cosAngle;
         double globalForward = forward * cosAngle + strafe * sinAngle;
 
-        double[] newWheelSpeeds = newDouble[4];
+        double[] newWheelSpeeds = newDouble;
 
         newWheelSpeeds[0] = globalForward + globalStrafe + spin;
         newWheelSpeeds[1] = globalForward + globalStrafe - spin;
@@ -118,7 +118,18 @@ public class TeleOp extends LinearOpMode {
         }
     }
     public void shooterControl(){
-        shooter.setPower(gamepad1.right_trigger * 0.75);
+        if (gamepad1.right_bumper){
+            shooter.setPower(.5);
+        }
+        else if (gamepad1.left_bumper){
+            shooter.setPower(0);
+        }
+        if (gamepad2.right_trigger>0.5){
+            lift2Launch.setPosition(1);
+        }
+        else {
+            lift2Launch.setPosition(0);
+        }
     }
     public void turretControl(){
         LLResult result = limelight.getLatestResult();
