@@ -7,6 +7,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
@@ -18,12 +19,11 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
-@Autonomous(name="Auto_Blue")
+@Autonomous(name="Auto_With_Odo")
 
 public class Auto_With_Odo extends LinearOpMode {
     private DcMotor leftFront, intake, leftBack, rightFront, rightBack, shooter, turret;
-    Limelight3A limelight3A;
-    public int StateCounter = 1;
+    Limelight3A limelight;
     GoBildaPinpointDriver pinpoint;
 
     @Override
@@ -35,38 +35,45 @@ public class Auto_With_Odo extends LinearOpMode {
         intake = hardwareMap.get(DcMotor.class, "intake");
         shooter = hardwareMap.get(DcMotor.class, "shooter");
         turret = hardwareMap.get(DcMotor.class, "turret");
-        leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        leftBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        rightBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-
-        limelight3A = hardwareMap.get(Limelight3A.class, "limelight 3A");
-        limelight3A.setPollRateHz(100); // This sets how often we ask Limelight for data (100 times per second)
-        limelight3A.start(); // This tells Limelight to start looking!
-        limelight3A.pipelineSwitch(0);
+        leftFront.setDirection(DcMotorSimple.Direction.FORWARD);
+        leftBack.setDirection(DcMotorSimple.Direction.FORWARD);
+        rightBack.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
+       // limelight = hardwareMap.get(Limelight3A.class, "limelight");
+        //limelight.setPollRateHz(100); // This sets how often we ask Limelight for data (100 times per second)
+        //limelight.start(); // This tells Limelight to start looking!
+       // limelight.pipelineSwitch(1);
 
         pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
         pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
         pinpoint.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.FORWARD);
+        pinpoint.initialize();
         pinpoint.update();
+
         waitForStart();
         while (opModeIsActive()) {
-            limeLightStuff();
+            //limeLightStuff();
 
-            step1(10,0,0,0.5);
-            step2(0,10,0,0.5);
-            step3(0,0,90,0.5);
+            step1(10,0,0,.5);
+            step2(0,10,0,.5);
+            step3(0,0,90,.5);
+
+            Pose2D pose = pinpoint.getPosition();
+            double x = pose.getX(DistanceUnit.INCH);
+            double y = pose.getY(DistanceUnit.INCH);
+            double heading = pose.getHeading(AngleUnit.DEGREES);
 
             telemetry.update();
-            telemetry.addData("leftfront", leftFront.getCurrentPosition());
-            telemetry.addData("rightfront", rightFront.getCurrentPosition());
-            telemetry.addData("leftback", leftBack.getCurrentPosition());
-            telemetry.addData("rightback", rightBack.getCurrentPosition());
+            telemetry.addData("Current X", x);
+            telemetry.addData("Current Y", y);
+            telemetry.addData("Heading", heading);
 
+            sleep(1000);
+            terminateOpModeNow();
         }
     }
     public void limeLightStuff(){
-        LLResult result = limelight3A.getLatestResult();
+        LLResult result = limelight.getLatestResult();
         double tx = 0;
         double ta = 0;
         if (result != null && result.isValid()) {
@@ -82,11 +89,11 @@ public class Auto_With_Odo extends LinearOpMode {
         }
 
         // Proportional control for alignment
-        double kP = 1; // Tuning constant for turning
+        double kP = .2; // Tuning constant for turning
         double turnPower = kP * tx;
 
         // Stop condition: If the target is centered and close enough
-        if (Math.abs(tx) > 3.30 && ta < .33) {
+        if (Math.abs(tx) > -5 && ta < .1) {
             turret.setPower(0);
 
             telemetry.addData("Status", "Aligned!");
@@ -96,7 +103,7 @@ public class Auto_With_Odo extends LinearOpMode {
 
             // Adjust motors to align with the target
             turret.setPower(-turnPower);
-            shooter.setPower(.75);
+
 
             telemetry.update();
             telemetry.addData("tx", tx);
@@ -106,54 +113,74 @@ public class Auto_With_Odo extends LinearOpMode {
     }
     private void step1(double targetX, double targetY, double targetHeading, double power){
         while (opModeIsActive()) {
+            pinpoint.update();
             Pose2D pose = pinpoint.getPosition();
             double x = pose.getX(DistanceUnit.INCH);
             double y = pose.getY(DistanceUnit.INCH);
             double heading = pose.getHeading(AngleUnit.DEGREES);
+
             double error = targetX - x;
+
             telemetry.addData("Step", "1");
             telemetry.addData("Current X", x);
             telemetry.addData("Current Y", y);
             telemetry.addData("Heading", heading);
+            telemetry.addData("Target X",targetX);
+            telemetry.addData("Target Y",targetY);
+            telemetry.addData("Target Heading",targetHeading);
             telemetry.addData("Power", power);
             telemetry.addData("Error", error);
             telemetry.update();
-            if (Math.abs(error) < 10) break;
+
+            if (Math.abs(error) < 1) break;
 
             double direction = Math.signum(error);
-            setAllDrivePower(power * direction);
+            setDrivePower(power * direction);
         }
+        stopMotors();
 
     }
     private void step2(double targetX, double targetY, double targetHeading, double power){
         while (opModeIsActive()) {
+            pinpoint.update();
             Pose2D pose = pinpoint.getPosition();
             double x = pose.getX(DistanceUnit.INCH);
             double y = pose.getY(DistanceUnit.INCH);
             double heading = pose.getHeading(AngleUnit.DEGREES);
+
             double error = targetY - y;
+
             telemetry.addData("Step", "2");
             telemetry.addData("Current X", x);
             telemetry.addData("Current Y", y);
             telemetry.addData("Heading", heading);
+            telemetry.addData("Target X",targetX);
+            telemetry.addData("Target Y",targetY);
+            telemetry.addData("Target Heading",targetHeading);
             telemetry.addData("Power", power);
             telemetry.addData("Error", error);
             telemetry.update();
-            if (Math.abs(error) < 10) break;
+
+            if (Math.abs(error) < 1) break;
 
             double direction = Math.signum(error);
             setStrafePower(power * direction);
+
         }
+        stopMotors();
 
     }
     private void step3(double targetX, double targetY, double targetHeading, double power){
         while (opModeIsActive()) {
+            pinpoint.update();
             Pose2D pose = pinpoint.getPosition();
             double x = pose.getX(DistanceUnit.INCH);
             double y = pose.getY(DistanceUnit.INCH);
             double heading = pose.getHeading(AngleUnit.DEGREES);
+
             double error = targetHeading - heading;
             error = normalizeAngle(error);
+
             telemetry.addData("Step", "3");
             telemetry.addData("Current X", x);
             telemetry.addData("Current Y", y);
@@ -164,35 +191,38 @@ public class Auto_With_Odo extends LinearOpMode {
             telemetry.addData("Power", power);
             telemetry.addData("Error", error);
             telemetry.update();
-            if (Math.abs(error) < Math.toRadians(2)) break;
+
+            if (Math.abs(error) > 90) break;
 
             double direction = Math.signum(error);
             setTurnPower(power * direction);
+
         }
         stopMotors();
+
     }
-    private void setAllDrivePower(double power) {
+    private void setDrivePower(double power) {
         leftFront.setPower(power);
         rightFront.setPower(power);
         leftBack.setPower(power);
         rightBack.setPower(power);
     }
     private void setStrafePower(double power) {
-        leftFront.setPower(power);
-        rightFront.setPower(-power);
-        leftBack.setPower(-power);
-        rightBack.setPower(power);
-    }
-    private void setTurnPower(double power) {
-        leftFront.setPower(power);
-        rightFront.setPower(-power);
+        leftFront.setPower(-power);
+        rightFront.setPower(power);
         leftBack.setPower(power);
         rightBack.setPower(-power);
+    }
+    private void setTurnPower(double power) {
+        leftFront.setPower(-power);
+        rightFront.setPower(power);
+        leftBack.setPower(-power);
+        rightBack.setPower(power);
     }
     private void stopMotors() {
         leftFront.setPower(0);
         rightFront.setPower(0);
-        leftFront.setPower(0);
+        leftBack.setPower(0);
         rightBack.setPower(0);
     }
     private double normalizeAngle(double angle) {
