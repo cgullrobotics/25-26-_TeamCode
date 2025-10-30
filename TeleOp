@@ -2,7 +2,6 @@ package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
-import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.hardware.limelightvision.LLResult;
@@ -11,7 +10,7 @@ import com.qualcomm.hardware.limelightvision.LLStatus;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
-@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp", group="Linear OpMode")
+@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp2025", group="Linear OpMode")
 
 public class TeleOp extends LinearOpMode {
     private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret,shooter;
@@ -40,11 +39,12 @@ public class TeleOp extends LinearOpMode {
         telemetry.addData(">", "robot ready . press play");
         telemetry.update();
 
-        leftFront.setDirection(DcMotor.Direction.REVERSE);
-        leftBack.setDirection(DcMotor.Direction.REVERSE);
-        rightFront.setDirection(DcMotor.Direction.FORWARD);
-        rightBack.setDirection(DcMotor.Direction.FORWARD);
+        leftFront.setDirection(DcMotor.Direction.FORWARD);
+        leftBack.setDirection(DcMotor.Direction.FORWARD);
+        rightFront.setDirection(DcMotor.Direction.REVERSE);
+        rightBack.setDirection(DcMotor.Direction.REVERSE);
         intake.setDirection(DcMotor.Direction.REVERSE);
+        ballTransfer1.setDirection(CRServo.Direction.REVERSE);
         ballTransfer1.setDirection(CRServo.Direction.REVERSE);
         angle.setDirection(Servo.Direction.REVERSE);
 
@@ -57,12 +57,10 @@ public class TeleOp extends LinearOpMode {
             angleManualOverride();
             turretManualOverride();
             shooterControl();
-            telemetry.addData("leftFront Position",leftFront.getCurrentPosition());
-            telemetry.addData("leftBack Position",leftBack.getCurrentPosition());
-            telemetry.addData("rightFront Position",rightFront.getCurrentPosition());
-            telemetry.addData("rightBack Position",rightBack.getCurrentPosition());
             telemetry.addData("Shooter Power", shooter.getPower());
+
             telemetry.update();
+
         }
     }
     public void driveTrain(){
@@ -81,12 +79,12 @@ public class TeleOp extends LinearOpMode {
         rightBack.setPower(rightBackPower);
     }
     public void intakeControl(){
-        if (gamepad1.right_trigger>0.5){
+        if (gamepad1.a){
             intake.setPower(-1);
             ballTransfer1.setPower(1);
             ballTransfer2.setPower(1);
         }
-        else if (gamepad1.left_trigger>0.5){
+        else if (gamepad1.b){
             intake.setPower(0);
             ballTransfer1.setPower(0);
             ballTransfer2.setPower(0);
@@ -94,15 +92,37 @@ public class TeleOp extends LinearOpMode {
     }
     public void shooterControl(){
         if (gamepad1.right_bumper){
-            shooter.setPower(.5);
+            LLResult result = limelight.getLatestResult();
+            double targetArea = 0;
+            double motorPower = 0;
+
+            if (result != null && result.isValid()) {
+                targetArea = result.getTa();  // Larger area = closer target
+
+                // Example: proportional speed control
+                // As targetArea increases (closer), power decreases.
+                // targetArea typically ranges ~0.1 (far) to ~20+ (very close)
+                motorPower = 1.0 - (targetArea * 1.5);
+                motorPower = Math.max(.2, Math.min(motorPower, 1.0)); // Clamp between 0.1–0.5
+
+                shooter.setPower(motorPower);
+
+                telemetry.addData("Target Area", targetArea);
+                telemetry.addData("Motor Power", motorPower);
+                telemetry.addData("Status", "Tracking Target");
+            } else {
+                // No target found — stop motor
+                shooter.setPower(0);
+                telemetry.addData("Status", "No Target Found");
+            }
         }
         else if (gamepad1.left_bumper){
             shooter.setPower(0);
         }
-        if (gamepad2.right_trigger>0.5){
+        if (gamepad2.right_bumper){
             lift2Launch.setPosition(1);
         }
-        else {
+        else if (gamepad2.left_bumper){
             lift2Launch.setPosition(0);
         }
     }
@@ -110,6 +130,9 @@ public class TeleOp extends LinearOpMode {
         LLResult result = limelight.getLatestResult();
         double tx = 0;
         double ta = 0;
+        double targetArea = 0;
+        double motorPower = 0;
+
         if (result !=null&& result.isValid()){
             tx = result.getTx();
             double ty = result.getTy();
@@ -122,10 +145,10 @@ public class TeleOp extends LinearOpMode {
         } else {
             telemetry.addData("limelight","No targets");
         }
-        double kP = .9;
+        double kP = .1;
         double turnPower = kP * tx;
 
-        if (Math.abs(tx)> -5 && ta < 2.0){
+        if (Math.abs(tx)> -5 && ta < .1){
             turret.setPower(0);
             telemetry.addData("status", "alligned!");
             telemetry.update();
@@ -135,7 +158,6 @@ public class TeleOp extends LinearOpMode {
         telemetry.addData("tx", tx);
         telemetry.addData("ta",ta);
         telemetry.addData("turnpower", turnPower);}
-
     }
     public void angleManualOverride(){
         if (gamepad2.dpad_up){
