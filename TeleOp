@@ -5,6 +5,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.LLStatus;
@@ -16,8 +17,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 public class TeleOp extends LinearOpMode {
     private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret;
     private DcMotorEx shooter;
-    private Servo angle;
+    private Servo angle,pwmLight;
     private CRServo ballTransfer;
+    private DigitalChannel distance;
     private Limelight3A limelight;
 
     @Override
@@ -30,9 +32,12 @@ public class TeleOp extends LinearOpMode {
         shooter = hardwareMap.get(DcMotorEx.class, "shooter");
         turret = hardwareMap.get(DcMotor.class, "turret");
         angle = hardwareMap.get(Servo.class,"angle");
+        pwmLight = hardwareMap.get(Servo.class,"pwmLight");
         ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
+        distance = hardwareMap.get(DigitalChannel.class,"distance");
         limelight = hardwareMap.get(Limelight3A.class,"limelight");
 
+        distance.setMode(DigitalChannel.Mode.INPUT);
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         limelight.setPollRateHz(100);
@@ -55,6 +60,7 @@ public class TeleOp extends LinearOpMode {
             angleManualOverride();
             turretManualOverride();
             shooterControl();
+            distanceControl();
 
             telemetry.update();
 
@@ -194,5 +200,16 @@ public class TeleOp extends LinearOpMode {
     }
     public void turretManualOverride(){
         turret.setPower(gamepad2.left_stick_x);
+    }
+    public void distanceControl(){
+        boolean stateHigh = distance.getState();
+        boolean detected = stateHigh;
+        if (detected) {
+            pwmLight.setPosition(.5);
+            telemetry.addLine("Object detected!");
+        } else {
+            pwmLight.setPosition(0);
+            telemetry.addLine("No object detected");
+        }
     }
 }
