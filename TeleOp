@@ -10,6 +10,8 @@ import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.LLStatus;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.util.ElapsedTime;
+
 import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp2025", group="Linear OpMode")
@@ -21,6 +23,11 @@ public class TeleOp extends LinearOpMode {
     private CRServo ballTransfer;
     private DigitalChannel distance;
     private Limelight3A limelight;
+    private ElapsedTime runtime = new ElapsedTime();
+
+    ElapsedTime timer = new ElapsedTime();
+    double countdownSeconds = 120.0;
+
 
     @Override
     public void runOpMode(){
@@ -52,15 +59,22 @@ public class TeleOp extends LinearOpMode {
         rightBack.setDirection(DcMotor.Direction.REVERSE);
         intake.setDirection(DcMotor.Direction.REVERSE);
         waitForStart();
+        runtime.reset();
 
         while (opModeIsActive()){
+
             driveTrain();
             intakeControl();
             turretControl();
             angleManualOverride();
             turretManualOverride();
             shooterControl();
-            distanceControl();
+            robotShutdowns();
+            double timeLeft = countdownSeconds - timer.seconds();
+
+            if (timeLeft < 0) timeLeft = 0;  // prevent negative numbers
+
+            telemetry.addData("Time Left", timeLeft);
 
             telemetry.update();
 
@@ -109,18 +123,35 @@ public class TeleOp extends LinearOpMode {
         }
         else {
             double targetRPM = 0;
-            if (gamepad1.y || gamepad2.a){
+            if (gamepad2.a){
                 targetRPM = 2000;
                 angle.setPosition(.1767);
             }
-            else if (gamepad1.x || gamepad2.b){
+            else if (gamepad2.b){
                 targetRPM = 2850;
                 angle.setPosition(.2167);
             }
             double COUNTS_PER_REVOLUTION = 28; // Example: Adjust for your specific motor
             double ticksPerSecond = (targetRPM / 60.0) * COUNTS_PER_REVOLUTION;
             shooter.setVelocity(ticksPerSecond);
-            telemetry.addData("shooter rpm",ticksPerSecond);
+
+
+            boolean stateHigh = distance.getState();
+            boolean detected = stateHigh;
+            if (detected) {
+                pwmLight.setPosition(.5);
+
+            }
+            else if (shooter.getVelocity()>1325){
+                pwmLight.setPosition(.611);
+            }
+            else if (shooter.getVelocity()>930){
+                pwmLight.setPosition(.611);
+            }
+            else {
+                pwmLight.setPosition(0);
+
+            }
         }
     }
     public void turretControl(){
@@ -200,16 +231,16 @@ public class TeleOp extends LinearOpMode {
     }
     public void turretManualOverride(){
         turret.setPower(gamepad2.left_stick_x);
+
     }
-    public void distanceControl(){
-        boolean stateHigh = distance.getState();
-        boolean detected = stateHigh;
-        if (detected) {
-            pwmLight.setPosition(.5);
-            telemetry.addLine("Object detected!");
-        } else {
-            pwmLight.setPosition(0);
-            telemetry.addLine("No object detected");
+    public void robotShutdowns(){
+        if (gamepad1.options&&gamepad1.share){
+            terminateOpModeNow();
+        }
+        double timeLeft = countdownSeconds - timer.seconds();
+        if (timeLeft<0){
+            terminateOpModeNow();
+
         }
     }
 }
