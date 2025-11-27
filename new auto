@@ -1,0 +1,207 @@
+package org.firstinspires.ftc.teamcode;
+import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
+import com.qualcomm.hardware.limelightvision.LLStatus;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+@Autonomous(name="newauto")
+public class newauto extends LinearOpMode{
+
+    private DcMotor leftFront, intake, leftback, rightFront, rightBack,  turret;
+    private DcMotorEx shooter;
+    private BNO055IMU imu;
+    private Servo angle,pwmlight;
+    private CRServo ballTransfer;
+    private double kP, kI, kD;
+    private double integral, previousError;
+    Limelight3A limelight3A;
+    public int StateCounter = 0;
+    @Override
+    public void runOpMode() throws InterruptedException{
+        leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        leftback = hardwareMap.get(DcMotor.class, "leftBack");
+        rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        rightBack = hardwareMap.get(DcMotor.class, "rightBack");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+        shooter = hardwareMap.get(DcMotorEx.class,"shooter");
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        angle = hardwareMap.get(Servo.class,"angle");
+        ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
+        leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        leftback.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        while (opModeInInit()){
+
+            if (gamepad1.x){
+                goalauto();
+            }
+            if (gamepad1.a){
+                farAuto();
+            }
+            if (gamepad1.b){
+                farshootleave();
+            }
+        }
+        waitForStart();
+        while (opModeIsActive()){
+            if (gamepad1.xWasPressed()){
+                goalauto();
+            }
+            if (gamepad1.aWasPressed()){
+                farAuto();
+            }
+            if (gamepad1.bWasPressed()){
+                farshootleave();
+            }
+
+        }
+    }
+
+    public void goalauto(){
+    while (opModeIsActive()){
+        switch (StateCounter){
+
+            case 0:{
+                //back away from goal
+                leftFront.setTargetPosition(-1832);
+                leftback.setTargetPosition(-1818);
+                rightFront.setTargetPosition(1769);
+                rightBack.setTargetPosition(1823);
+                leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftFront.setPower(-.5);
+                leftback.setPower(-.5);
+                rightFront.setPower(.5);
+                rightBack.setPower(.5);
+                StateCounter = 1;
+            }
+            case 1:{
+                //shooting into a goal
+                double targetRPM = 0;
+                targetRPM = 6000;
+                if (targetRPM<5700){
+                    ballTransfer.setPower(-1);
+                    sleep(1000);
+                    ballTransfer.setPower(0);
+                    break;
+                }
+                double COUNTS_PER_REVOLUTION = 28; // Example: Adjust for your specific motor
+                double ticksPerSecond = (targetRPM / 60.0) * COUNTS_PER_REVOLUTION;
+                shooter.setVelocity(ticksPerSecond);
+                StateCounter =7;
+            }
+            case 2:{
+                //line up to intake more artifacts
+                leftFront.setTargetPosition(255);
+                leftback.setTargetPosition(-2431);
+                rightFront.setTargetPosition(2411);
+                rightBack.setTargetPosition(-266);
+                leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftFront.setPower(1);
+                leftback.setPower(1);
+                rightFront.setPower(-1);
+                rightBack.setPower(-1);
+                StateCounter=3;
+            }
+            case 3:{
+                //intake artifacts
+                intake.setPower(1);
+                leftFront.setTargetPosition(255);
+                leftback.setTargetPosition(-2431);
+                rightFront.setTargetPosition(2411);
+                rightBack.setTargetPosition(-266);
+                leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftFront.setPower(1);
+                leftback.setPower(1);
+                rightFront.setPower(-1);
+                rightBack.setPower(-1);
+                intake.setPower(0);
+                StateCounter = 4;
+            }
+            case 4:{
+                //line back up to shoot artifacts
+                leftFront.setTargetPosition(255);
+                leftback.setTargetPosition(-2431);
+                rightFront.setTargetPosition(2411);
+                rightBack.setTargetPosition(-266);
+                leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftFront.setPower(1);
+                leftback.setPower(1);
+                rightFront.setPower(-1);
+                rightBack.setPower(-1);
+                StateCounter = 5;
+            }
+            case 5:{
+                //shoot artifacts
+                double targetRPM = 0;
+                targetRPM = 6000;
+                if (targetRPM<5700){
+                    ballTransfer.setPower(-1);
+                    sleep(1000);
+                    ballTransfer.setPower(0);
+                    break;
+                }
+                double COUNTS_PER_REVOLUTION = 28; // Example: Adjust for your specific motor
+                double ticksPerSecond = (targetRPM / 60.0) * COUNTS_PER_REVOLUTION;
+                shooter.setVelocity(ticksPerSecond);
+                StateCounter = 6;
+            }
+            case 6:{
+                //move out
+                leftFront.setTargetPosition(255);
+                leftback.setTargetPosition(-2431);
+                rightFront.setTargetPosition(2411);
+                rightBack.setTargetPosition(-266);
+                leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                leftFront.setPower(1);
+                leftback.setPower(1);
+                rightFront.setPower(-1);
+                rightBack.setPower(-1);
+            }
+        }
+
+
+
+
+    }
+    }
+    public void farAuto(){
+        while (opModeIsActive()){
+
+        }
+
+    }
+    public void farshootleave(){
+
+    }
+
+}
+
