@@ -3,6 +3,7 @@ package org.firstinspires.ftc.teamcode;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
@@ -27,7 +28,7 @@ public class TeleOp extends LinearOpMode {
 
     ElapsedTime timer = new ElapsedTime();
     double countdownSeconds = 120.0;
-
+    double targetRPM=0;
 
     @Override
     public void runOpMode(){
@@ -103,16 +104,29 @@ public class TeleOp extends LinearOpMode {
         }
     }
     public void intakeControl(){
+        boolean stateHigh = distance.getState();
+        boolean detected = stateHigh;
+        if (detected){
+            ballTransfer.setPower(0);
+        }
         if (gamepad1.left_bumper){
             intake.setPower(0);
+            ballTransfer.setPower(0);
+
         }
         else if (gamepad1.right_bumper){
             intake.setPower(-1);
-        }
-        if (gamepad2.left_bumper){
             ballTransfer.setPower(-.5);
         }
-        else if (gamepad2.right_bumper){
+        else if (gamepad1.y){
+            intake.setPower(1);
+        }
+
+        if (gamepad2.right_bumper){
+            ballTransfer.setPower(-.5);
+        } else if (gamepad2.left_bumper) {
+            ballTransfer.setPower(.5);
+        } else {
             ballTransfer.setPower(0);
         }
     }
@@ -122,37 +136,38 @@ public class TeleOp extends LinearOpMode {
             shooter.setPower(gamepad2.right_trigger);
         }
         else {
-            double targetRPM = 0;
-            if (gamepad2.a){
-                targetRPM = 2000;
-                angle.setPosition(.1767);
-            }
-            else if (gamepad2.b){
-                targetRPM = 2850;
-                angle.setPosition(.2167);
+
+
+            if (gamepad2.x) {
+                targetRPM = 0;
+            } else if (gamepad2.a) {
+                if (targetRPM < 2100) {
+                    targetRPM = 2100;
+                    //angle.setPosition(.1767);
+                }
+            } else if (gamepad2.b) {
+                if (targetRPM < 2850) {
+                    targetRPM = 2850;
+                    angle.setPosition(.457);
+                }
             }
             double COUNTS_PER_REVOLUTION = 28; // Example: Adjust for your specific motor
             double ticksPerSecond = (targetRPM / 60.0) * COUNTS_PER_REVOLUTION;
             shooter.setVelocity(ticksPerSecond);
 
-
             boolean stateHigh = distance.getState();
             boolean detected = stateHigh;
             if (detected) {
                 pwmLight.setPosition(.5);
-
-            }
-            else if (shooter.getVelocity()>1325){
+            } else if (shooter.getVelocity() > 1325) {
                 pwmLight.setPosition(.611);
-            }
-            else if (shooter.getVelocity()>930){
+            } else if (shooter.getVelocity() > 930) {
                 pwmLight.setPosition(.611);
-            }
-            else {
+            } else {
                 pwmLight.setPosition(0);
-
             }
         }
+
     }
     public void turretControl(){
         LLResult result = limelight.getLatestResult();
@@ -230,8 +245,15 @@ public class TeleOp extends LinearOpMode {
         }
     }
     public void turretManualOverride(){
-        turret.setPower(gamepad2.left_stick_x);
-
+        if(gamepad1.left_trigger>.5){
+            turret.setPower(1);
+        }
+        else if(gamepad1.right_trigger>.5){
+            turret.setPower(-1);
+        }
+        else{
+            turret.setPower(gamepad2.left_stick_x);
+        }
     }
     public void robotShutdowns(){
         if (gamepad1.options&&gamepad1.share){
@@ -239,7 +261,7 @@ public class TeleOp extends LinearOpMode {
         }
         double timeLeft = countdownSeconds - timer.seconds();
         if (timeLeft<0){
-            terminateOpModeNow();
+
 
         }
     }
