@@ -131,24 +131,19 @@ public class TeleOp extends LinearOpMode {
         }
     }
     public void shooterControl(){
-        if (gamepad2.left_trigger>0.5){
-            shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-            shooter.setPower(gamepad2.right_trigger);
-        }
-        else {
 
 
             if (gamepad2.x) {
                 targetRPM = 0;
             } else if (gamepad2.a) {
                 if (targetRPM < 2100) {
-                    targetRPM = 2100;
+                    targetRPM = 2300;
                     //angle.setPosition(.1767);
                 }
             } else if (gamepad2.b) {
                 if (targetRPM < 2850) {
                     targetRPM = 2850;
-                    angle.setPosition(.457);
+                    angle.setPosition(.5556);
                 }
             }
             double COUNTS_PER_REVOLUTION = 28; // Example: Adjust for your specific motor
@@ -166,7 +161,7 @@ public class TeleOp extends LinearOpMode {
             } else {
                 pwmLight.setPosition(0);
             }
-        }
+
 
     }
     public void turretControl(){
@@ -189,7 +184,7 @@ public class TeleOp extends LinearOpMode {
         else {
             telemetry.addData("limelight","No targets");
         }
-        double kP = 0.6;
+        double kP = 0.8;
         double kI = .2;
         double kD = 0.006;
 
@@ -217,13 +212,13 @@ public class TeleOp extends LinearOpMode {
         double turnPower = (kP * error) + (kI * integral) + (kD * derivative);
 
 // Clamp power to avoid excessive speed
-        turnPower = Math.max(-.3, Math.min(.3, turnPower));
+        turnPower = Math.max(-.7, Math.min(.7, turnPower));
         if (Math.abs(error) < .8) {  // 1 degree or pixel, depending on tx units
             turnPower = .03;
         }
 
 // Stop condition: target centered and close enough
-        if (Math.abs(error) < -1 && ta > .2) {
+        if (Math.abs(error) < 0 && ta > .4) {
             turret.setPower(0);
             telemetry.addData("Status", "Aligned!");
         } else {
@@ -237,19 +232,20 @@ public class TeleOp extends LinearOpMode {
 
     }
     public void angleManualOverride(){
-        if (gamepad2.dpad_down){
+        if (gamepad2.left_trigger>.5){
             angle.setPosition(angle.getPosition()+.001);
         }
-        else if (gamepad2.dpad_up){
+        else if (gamepad2.right_trigger>.5){
             angle.setPosition(angle.getPosition()-.001);
         }
+
     }
     public void turretManualOverride(){
         if(gamepad1.left_trigger>.5){
-            turret.setPower(1);
+            turret.setPower(.8);
         }
         else if(gamepad1.right_trigger>.5){
-            turret.setPower(-1);
+            turret.setPower(-.8);
         }
         else{
             turret.setPower(gamepad2.left_stick_x);
