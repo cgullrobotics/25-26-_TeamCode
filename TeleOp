@@ -104,14 +104,6 @@ public class TeleOp extends LinearOpMode {
         }
     }
     public void intakeControl(){
-        boolean stateHigh = distance.getState();
-        boolean detected = stateHigh;
-
-        if (gamepad1.left_bumper){
-            intake.setPower(0);
-            ballTransfer.setPower(0);
-
-        }
         else if (gamepad1.right_bumper){
             intake.setPower(-1);
             ballTransfer.setPower(-.5);
