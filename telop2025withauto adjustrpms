@@ -1,0 +1,306 @@
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.robotcore.external.navigation.Velocity;
+
+@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp2025", group="Linear OpMode")
+
+public class TeleOp extends LinearOpMode {
+    private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret;
+    private DcMotorEx shooter;
+    private Servo angle,pwmLight;
+    private CRServo ballTransfer;
+    private DigitalChannel distance;
+    private Limelight3A limelight;
+    private ElapsedTime runtime = new ElapsedTime();
+
+    ElapsedTime timer = new ElapsedTime();
+    double countdownSeconds = 120.0;
+    double targetRPM=0;
+    double m =-600;
+    double b =2550;
+    private double lastTa;
+    double kP = .07;
+    double kI =0;
+    double kD = 0.002;
+
+    double filteredRPM = 0;   // for smoothing
+    double rpmAlpha = 0.20;   // smoothing factor (0–1)
+
+    @Override
+    public void runOpMode(){
+        leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        leftBack = hardwareMap.get(DcMotor.class, "leftBack");
+        rightBack = hardwareMap.get(DcMotor.class, "rightBack");
+        rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+        shooter = hardwareMap.get(DcMotorEx.class, "shooter");
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        angle = hardwareMap.get(Servo.class,"angle");
+        pwmLight = hardwareMap.get(Servo.class,"pwmLight");
+        ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
+        distance = hardwareMap.get(DigitalChannel.class,"distance");
+        limelight = hardwareMap.get(Limelight3A.class,"limelight");
+
+        distance.setMode(DigitalChannel.Mode.INPUT);
+        shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        limelight.setPollRateHz(100);
+        limelight.pipelineSwitch(1);
+        limelight.start();
+        telemetry.addData(">", "robot ready . press play");
+        telemetry.update();
+
+        leftFront.setDirection(DcMotor.Direction.FORWARD);
+        leftBack.setDirection(DcMotor.Direction.FORWARD);
+        rightFront.setDirection(DcMotor.Direction.REVERSE);
+        rightBack.setDirection(DcMotor.Direction.REVERSE);
+        intake.setDirection(DcMotor.Direction.REVERSE);
+        shooter.setDirection(DcMotor.Direction.FORWARD);
+
+
+
+        waitForStart();
+        runtime.reset();
+
+        while (opModeIsActive()){
+
+            driveTrain();
+            intakeControl();
+            turretControl();
+            angleManualOverride();
+            turretManualOverride();
+            shooterControl();
+            robotShutdowns();
+            double timeLeft = countdownSeconds - timer.seconds();
+
+            if (timeLeft < 0) timeLeft = 0;  // prevent negative numbers
+
+            telemetry.addData("Time Left", timeLeft);
+
+
+            telemetry.update();
+
+        }
+    }
+    public void driveTrain(){
+
+        double x = -gamepad1.left_stick_y;
+        double y = gamepad1.left_stick_x;
+        double z = (gamepad1.right_stick_x);
+
+        double leftFrontPower = x - y + z;
+        double leftBackPower = x + y + z;
+        double rightFrontPower = x - y - z;
+        double rightBackPower = x + y - z;
+
+        leftFront.setPower(leftFrontPower);
+        leftBack.setPower(leftBackPower);
+        rightFront.setPower(rightFrontPower);
+        rightBack.setPower(rightBackPower);
+        if(gamepad1.dpad_up){
+            limelight.pipelineSwitch(0);
+        }
+        if(gamepad1.dpad_down){
+            limelight.pipelineSwitch(1);
+        }
+    }
+    public void intakeControl(){
+        boolean stateHigh = distance.getState();
+        boolean detected = stateHigh;
+
+        if (gamepad1.left_bumper){
+            intake.setPower(0);
+            ballTransfer.setPower(0);
+
+        }
+        else if (gamepad1.right_bumper){
+            intake.setPower(-1);
+            ballTransfer.setPower(-.5);
+        }
+        else if (gamepad1.y){
+            intake.setPower(1);
+        }
+
+        if (gamepad2.right_bumper){
+            ballTransfer.setPower(-.5);
+            intake.setPower(-1);
+        } else if (gamepad2.left_bumper) {
+            ballTransfer.setPower(.5);
+        } else {
+            ballTransfer.setPower(0);
+
+        }
+    }
+
+    public void shooterControl(){
+
+        LLResult result = limelight.getLatestResult();
+
+
+            double ty = result.getTy();
+
+            // Limelight-based RPM calculation
+            targetRPM = (m * ty) + b;
+
+            // Clamp RPM to safe range
+            targetRPM = Math.max(400, Math.min(100, targetRPM));
+
+
+         if (gamepad2.b) {
+             targetRPM = 2750;   // fallback preset
+         }
+        filteredRPM = filteredRPM + rpmAlpha * (targetRPM - filteredRPM);
+        double COUNTS_PER_REV = 237.6; // adjust if needed
+        double ticksPerSecond = (filteredRPM / 60.0) * COUNTS_PER_REV;
+
+
+
+        shooter.setVelocity(ticksPerSecond);
+        if (result == null || !result.isValid()) {
+            shooter.setVelocity(0);
+            filteredRPM = 0;
+            return;
+        }
+
+
+        // Convert ty to servo position
+
+
+
+
+
+            boolean stateHigh = distance.getState();
+            boolean detected = stateHigh;
+            if (detected) {
+                pwmLight.setPosition(.5);
+            } else if (shooter.getVelocity() > 1325) {
+                pwmLight.setPosition(.611);
+            } else if (shooter.getVelocity() > 930) {
+                pwmLight.setPosition(.611);
+            } else {
+                pwmLight.setPosition(0);
+            }
+
+
+    }
+    public void turretControl(){
+        LLResult result = limelight.getLatestResult();
+        double tx = 0;
+        double ta = 0;
+        double targetArea = 0;
+        double motorPower = 0;
+
+
+        if (result !=null&& result.isValid()){
+            tx = result.getTx();
+            double ty = result.getTy();
+            ta = result.getTa();
+
+            telemetry.addData("Target X", tx);
+            telemetry.addData("Target Y", ty);
+            telemetry.addData("Target Area", ta);
+            double rpm = (shooter.getVelocity() / 537.6) * 60.0;
+            telemetry.addData("Shooter RPM", rpm);
+
+        }
+        else {
+            telemetry.addData("limelight","No targets");
+        }
+
+
+
+// Variables for PID
+        double previousError = 0;
+        double integral = 0;
+
+        double target = 0; // Desired tx value (centered on target)
+
+// Inside your loop:
+        double error = target - tx;
+
+// Integral term (only accumulate when error is small to avoid windup)
+        if (Math.abs(error) < 10) {
+            integral += error;
+        } else {
+            integral = 0.0;
+        }
+
+// Derivative term
+        double derivative = error - previousError;
+        previousError = error;
+
+// PID output
+        double turnPower = (kP * error) + (kI * integral) + (kD * derivative);
+
+// Clamp power to avoid excessive speed
+        turnPower = Math.max(-.9, Math.min(.9, turnPower));
+        if (Math.abs(error) < -2) {  // 1 degree or pixel, depending on tx units
+            turnPower = .07;
+
+
+
+        }
+
+// Stop condition: target centered and close enough
+        if (Math.abs(error) < 0 && ta > .4) {
+            turret.setPower(0);
+            telemetry.addData("Status", "Aligned!");
+        } else {
+            turret.setPower(-turnPower);
+        }
+
+
+
+
+
+    }
+
+
+    public void angleManualOverride(){
+        if (gamepad2.dpad_down){
+            angle.setPosition(angle.getPosition()+.001);
+        }
+        else if (gamepad2.dpad_up){
+            angle.setPosition(angle.getPosition()-.001);
+        }
+        if (gamepad2.y){
+            angle.setPosition(.556);
+        } else if (gamepad2.a) {
+            angle.setPosition(.556);
+
+        }
+
+    }
+    public void turretManualOverride(){
+        if(gamepad1.left_trigger>.5){
+            turret.setPower(.8);
+        }
+        else if(gamepad1.right_trigger>.5){
+            turret.setPower(-.8);
+        }
+        else{
+            turret.setPower(gamepad2.left_stick_x);
+        }
+    }
+    public void robotShutdowns(){
+        if (gamepad1.options&&gamepad1.share){
+            terminateOpModeNow();
+        }
+        double timeLeft = countdownSeconds - timer.seconds();
+        if (timeLeft<0){
+
+
+
+        }
+    }
+}
