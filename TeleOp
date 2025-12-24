@@ -8,12 +8,10 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.hardware.limelightvision.LLResult;
-import com.qualcomm.hardware.limelightvision.LLResultTypes;
-import com.qualcomm.hardware.limelightvision.LLStatus;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
+import org.firstinspires.ftc.robotcore.external.navigation.Velocity;
 
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp2025", group="Linear OpMode")
 
@@ -29,6 +27,16 @@ public class TeleOp extends LinearOpMode {
     ElapsedTime timer = new ElapsedTime();
     double countdownSeconds = 120.0;
     double targetRPM=0;
+    double m =-600;
+    double b =2550;
+    private double lastTa;
+    double kP = 1.09;
+
+    double kI =0; 
+    double kD = 0.002;
+
+    double filteredRPM = 0;   // for smoothing
+    double rpmAlpha = 0.20;   // smoothing factor (0–1)
 
     @Override
     public void runOpMode(){
@@ -59,6 +67,10 @@ public class TeleOp extends LinearOpMode {
         rightFront.setDirection(DcMotor.Direction.REVERSE);
         rightBack.setDirection(DcMotor.Direction.REVERSE);
         intake.setDirection(DcMotor.Direction.REVERSE);
+        shooter.setDirection(DcMotor.Direction.FORWARD);
+
+
+
         waitForStart();
         runtime.reset();
 
@@ -77,6 +89,7 @@ public class TeleOp extends LinearOpMode {
 
             telemetry.addData("Time Left", timeLeft);
 
+
             telemetry.update();
 
         }
@@ -85,7 +98,7 @@ public class TeleOp extends LinearOpMode {
 
         double x = -gamepad1.left_stick_y;
         double y = gamepad1.left_stick_x;
-        double z = 0.5*(gamepad1.right_stick_x);
+        double z = (gamepad1.right_stick_x);
 
         double leftFrontPower = x - y + z;
         double leftBackPower = x + y + z;
@@ -104,6 +117,14 @@ public class TeleOp extends LinearOpMode {
         }
     }
     public void intakeControl(){
+        boolean stateHigh = distance.getState();
+        boolean detected = stateHigh;
+
+        if (gamepad1.left_bumper){
+            intake.setPower(0);
+            ballTransfer.setPower(0);
+
+        }
         else if (gamepad1.right_bumper){
             intake.setPower(-1);
             ballTransfer.setPower(-.5);
@@ -114,31 +135,51 @@ public class TeleOp extends LinearOpMode {
 
         if (gamepad2.right_bumper){
             ballTransfer.setPower(-.5);
+            intake.setPower(-1);
         } else if (gamepad2.left_bumper) {
             ballTransfer.setPower(.5);
         } else {
             ballTransfer.setPower(0);
+
         }
     }
+
     public void shooterControl(){
 
 
-            if (gamepad2.x) {
-                targetRPM = 0;
-            } else if (gamepad2.a) {
-                if (targetRPM < 2100) {
-                    targetRPM = 2300;
-                    //angle.setPosition(.1767);
-                }
-            } else if (gamepad2.b) {
-                if (targetRPM < 2850) {
-                    targetRPM = 2850;
-                    angle.setPosition(.5556);
-                }
-            }
-            double COUNTS_PER_REVOLUTION = 28; // Example: Adjust for your specific motor
-            double ticksPerSecond = (targetRPM / 60.0) * COUNTS_PER_REVOLUTION;
+
+        if (gamepad2.x) {
+            targetRPM = 0;
+        }
+        if (gamepad2.a) {
+
+                targetRPM = 2300;
+                //angle.setPosition(.1767);
+
+        } else if (gamepad2.b) {
+
+                targetRPM = 2850;
+                angle.setPosition(.5556);
+
+        }
+        double COUNTS_PER_REVOLUTION = 28; // Example: Adjust for your specific motor
+        double ticksPerSecond = (targetRPM / 60.0) * COUNTS_PER_REVOLUTION;
+
+
+
+
+
+
             shooter.setVelocity(ticksPerSecond);
+
+
+
+
+        // Convert ty to servo position
+
+
+
+
 
             boolean stateHigh = distance.getState();
             boolean detected = stateHigh;
@@ -161,6 +202,7 @@ public class TeleOp extends LinearOpMode {
         double targetArea = 0;
         double motorPower = 0;
 
+
         if (result !=null&& result.isValid()){
             tx = result.getTx();
             double ty = result.getTy();
@@ -169,14 +211,15 @@ public class TeleOp extends LinearOpMode {
             telemetry.addData("Target X", tx);
             telemetry.addData("Target Y", ty);
             telemetry.addData("Target Area", ta);
+            double rpm = (shooter.getVelocity() / 28) * 60.0;
+            telemetry.addData("Shooter RPM", rpm);
 
         }
         else {
             telemetry.addData("limelight","No targets");
         }
-        double kP = 0.8;
-        double kI = .2;
-        double kD = 0.006;
+
+
 
 // Variables for PID
         double previousError = 0;
@@ -202,10 +245,8 @@ public class TeleOp extends LinearOpMode {
         double turnPower = (kP * error) + (kI * integral) + (kD * derivative);
 
 // Clamp power to avoid excessive speed
-        turnPower = Math.max(-.7, Math.min(.7, turnPower));
-        if (Math.abs(error) < .8) {  // 1 degree or pixel, depending on tx units
-            turnPower = .03;
-        }
+        turnPower = Math.max(-.9, Math.min(.9, turnPower));
+
 
 // Stop condition: target centered and close enough
         if (Math.abs(error) < 0 && ta > .4) {
@@ -215,18 +256,25 @@ public class TeleOp extends LinearOpMode {
             turret.setPower(-turnPower);
         }
 
-        telemetry.addData("Error", error);
-        telemetry.addData("Turn Power", turnPower);
-        telemetry.addData("angle",angle.getPosition());
-        telemetry.update();
+
+
+
 
     }
+
+
     public void angleManualOverride(){
-        if (gamepad2.left_trigger>.5){
+        if (gamepad2.dpad_down){
             angle.setPosition(angle.getPosition()+.001);
         }
-        else if (gamepad2.right_trigger>.5){
+        else if (gamepad2.dpad_up){
             angle.setPosition(angle.getPosition()-.001);
+        }
+        if (gamepad2.y){
+            angle.setPosition(.556);
+        } else if (gamepad2.a) {
+            angle.setPosition(.556);
+
         }
 
     }
@@ -241,14 +289,21 @@ public class TeleOp extends LinearOpMode {
             turret.setPower(gamepad2.left_stick_x);
         }
     }
-    public void robotShutdowns(){
-        if (gamepad1.options&&gamepad1.share){
+    public void robotShutdowns() {
+        if (gamepad1.options && gamepad1.share) {
             terminateOpModeNow();
         }
+
         double timeLeft = countdownSeconds - timer.seconds();
-        if (timeLeft<0){
+        if (timeLeft < 0) {
 
 
         }
-    }
-}
+        boolean endgameRumbled = false;
+        if (timeLeft < 20) {
+            gamepad1.rumble(1000);
+
+        } else if (timeLeft < 5){
+            gamepad1.stopRumble();
+        }
+    }}
