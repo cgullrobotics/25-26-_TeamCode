@@ -1,0 +1,367 @@
+package org.firstinspires.ftc.teamcode;
+import static org.firstinspires.ftc.robotcore.external.BlocksOpModeCompanion.hardwareMap;
+
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.HardwareMap;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.LLResultTypes;
+import com.qualcomm.hardware.limelightvision.LLStatus;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+
+@Autonomous(name="Auto_Blue")
+
+public class Auto_Blue extends LinearOpMode {
+    private DcMotor leftFront, intake, leftback, rightFront, rightBack,  turret;
+    private Servo angle;
+    private DcMotorEx shooter;
+    private CRServo ballTransfer;
+    private double kP, kI, kD;
+    private double integral, previousError;
+    Limelight3A limelight;
+
+    public int StateCounter = 1;
+
+
+    @Override
+    public void runOpMode() throws InterruptedException {
+        leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        leftback = hardwareMap.get(DcMotor.class, "leftBack");
+        rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        rightBack = hardwareMap.get(DcMotor.class, "rightBack");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+        shooter = hardwareMap.get(DcMotorEx.class,"shooter");
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        angle = hardwareMap.get(Servo.class,"angle");
+        ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
+        leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        leftback.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        limelight = hardwareMap.get(Limelight3A.class,"limelight");
+        shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        limelight.setPollRateHz(100); // This sets how often we ask Limelight for data (100 times per second)
+        limelight.start(); // This tells Limelight to start looking!
+        limelight.pipelineSwitch(1);
+        angle.setPosition(.5356);
+        waitForStart();
+        while (opModeIsActive()) {
+            telemetry.update();
+            telemetry.addData("leftfront",leftFront.getCurrentPosition());
+            telemetry.addData("rightfront",rightFront.getCurrentPosition());
+            telemetry.addData("leftback",leftback.getCurrentPosition());
+            telemetry.addData("rightback",rightBack.getCurrentPosition());
+            LLResult result = limelight.getLatestResult();
+            double tx = 0;
+            double ta = 0;
+            if (result != null && result.isValid()) {
+                tx = result.getTx();
+                double ty = result.getTy(); // How far up or down the target is (degrees)
+                ta = result.getTa();
+
+                telemetry.addData("Target X", tx);
+                telemetry.addData("Target Y", ty);
+                telemetry.addData("Target Area", ta);
+            } else {
+                telemetry.addData("Limelight", "No Targets");
+            }
+
+            // Proportional control for alignment
+            double kP = 0.6;
+            double kI = .2;
+            double kD = 0.006;
+
+// Variables for PID
+            double previousError = 0;
+            double integral = 0;
+
+            double target = 0; // Desired tx value (centered on target)
+
+// Inside your loop:
+            double error = target - tx;
+
+// Integral term (only accumulate when error is small to avoid windup)
+            if (Math.abs(error) < 10) {
+                integral += error;
+            } else {
+                integral = 0.0;
+            }
+
+// Derivative term
+            double derivative = error - previousError;
+            previousError = error;
+
+// PID output
+            double turnPower = (kP * error) + (kI * integral) + (kD * derivative);
+
+// Clamp power to avoid excessive speed
+            turnPower = Math.max(0, Math.min(0, turnPower));
+            if (Math.abs(error) < .8) {  // 1 degree or pixel, depending on tx units
+                turnPower = .03;
+            }
+
+// Stop condition: target centered and close enough
+            if (Math.abs(error) < 0 && ta > .4) {
+                turret.setPower(0);
+                telemetry.addData("Status", "Aligned!");
+            } else {
+                turret.setPower(-turnPower);
+            }
+
+            telemetry.addData("Error", error);
+            telemetry.addData("Turn Power", turnPower);
+            telemetry.addData("angle",angle.getPosition());
+            telemetry.update();
+
+
+
+            switch (StateCounter) {
+
+
+                case 1: {
+                    double targetRPM = 2999;
+                    double COUNTS_PER_REVOLUTION = 28; // Example: Adjust for your specific motor
+                    double ticksPerSecond = (targetRPM / 60.0) * COUNTS_PER_REVOLUTION;
+                    shooter.setVelocity(ticksPerSecond);
+                    telemetry.addData("shooter rpm",ticksPerSecond);
+                    sleep(3200);
+                    intake.setPower(1);
+                    angle.setPosition(.5356);
+                    sleep(2200);
+                    ballTransfer.setPower(-1);
+                    sleep(500);
+                    ballTransfer.setPower(0);
+                    sleep(1320);
+                    ballTransfer.setPower(-1);
+                    sleep(200);
+                    ballTransfer.setPower(0);
+                    sleep(800);
+                    ballTransfer.setPower(-1);
+                    sleep(1500);
+                    ballTransfer.setPower(0);
+                    intake.setPower(0);
+                    sleep(3700);
+
+
+
+                    leftFront.setTargetPosition(-1162);
+                    leftback.setTargetPosition(1193);
+                    rightFront.setTargetPosition(1057);
+                    rightBack.setTargetPosition(-1325);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(1);
+                    leftback.setPower(-1);
+                    rightFront.setPower(1);
+                    rightBack.setPower(-1);
+
+
+                    sleep(2500);
+                    StateCounter=2;
+                    terminateOpModeNow();
+
+
+
+
+                    break;
+                }
+                case 2: {
+                    intake.setPower(1);
+
+                    leftFront.setTargetPosition(-397);
+                    leftback.setTargetPosition(1244);
+                    rightFront.setTargetPosition(268);
+                    rightBack.setTargetPosition(-1407);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(.32);
+                    leftback.setPower(.32);
+                    rightFront.setPower(.32);
+                    rightBack.setPower(.32);
+
+
+
+
+                    sleep(2500);
+                    StateCounter = 3;
+
+                    break;
+
+                }
+                case 3: {
+                    intake.setPower(0);
+                    leftFront.setTargetPosition(-649);
+                    leftback.setTargetPosition(777);
+                    rightFront.setTargetPosition(-564);
+                    rightBack.setTargetPosition(589);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(.8);
+                    leftback.setPower(.8);
+                    rightFront.setPower(-.8);
+                    rightBack.setPower(-.8);
+
+
+                    sleep(3000);
+                    //leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    //leftback.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    //rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    //rightBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    //StateCounter = 4;
+
+                }
+                case 4: {
+                    shooter.setPower(.75);
+                    angle.setPosition(.192);
+                    ballTransfer.setPower(.3);
+                    sleep(300);
+                    ballTransfer.setPower(0);
+                    sleep(500);
+                    ballTransfer.setPower(.3);
+                    sleep(300);
+                    ballTransfer.setPower(0);
+                    sleep(3000);
+                    leftFront.setTargetPosition(-1347);
+                    leftback.setTargetPosition(3841);
+                    rightFront.setTargetPosition(-3554);
+                    rightBack.setTargetPosition(1384);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(-.8);
+                    leftback.setPower(-.8);
+                    rightFront.setPower(.8);
+                    rightBack.setPower(.8);
+
+
+                    sleep(4000);
+                    StateCounter = 5;
+                    break;
+                }
+                case 5: {
+                    intake.setPower(1);
+                    leftFront.setTargetPosition(-679);
+                    leftback.setTargetPosition(4546);
+                    rightFront.setTargetPosition(-4287);
+                    rightBack.setTargetPosition(700);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(.3);
+                    leftback.setPower(-.3);
+                    rightFront.setPower(-.3);
+                    rightBack.setPower(.3);
+
+
+
+                    sleep(2500);
+                    StateCounter = 6;
+
+                }
+                case 6: {
+
+                    intake.setPower(0);
+                    leftFront.setTargetPosition(-2576);
+                    leftback.setTargetPosition(3251);
+                    rightFront.setTargetPosition(-3038);
+                    rightBack.setTargetPosition(2625);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(-1);
+                    leftback.setPower(1);
+                    rightFront.setPower(1);
+                    rightBack.setPower(-1);
+
+
+
+                    sleep(5000);
+                    StateCounter = 0;
+                }
+                case 7: {
+                    shooter.setPower(.75);
+                    angle.setPosition(.192);
+                    ballTransfer.setPower(.3);
+                    sleep(300);
+                    ballTransfer.setPower(0);
+                    sleep(500);
+                    ballTransfer.setPower(.3);
+                    sleep(300);
+                    ballTransfer.setPower(0);
+                    sleep(3000);
+
+                    leftFront.setTargetPosition(-1884);
+                    leftback.setTargetPosition(4951);
+                    rightFront.setTargetPosition(-4709);
+                    rightBack.setTargetPosition(1937);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(-.8);
+                    leftback.setPower(-.8);
+                    rightFront.setPower(.8);
+                    rightBack.setPower(.8);
+
+
+                    sleep(3000);
+                    StateCounter = 0;
+                }
+                case 8:{
+                    intake.setPower(1);
+                    leftFront.setTargetPosition(-1496);
+                    leftback.setTargetPosition(-2239);
+                    rightFront.setTargetPosition(2306);
+                    rightBack.setTargetPosition(1515);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(.3);
+                    leftback.setPower(.3);
+                    rightFront.setPower(-.3);
+                    rightBack.setPower(-.3);
+                    sleep(1000);
+                    intake.setPower(0);
+                    sleep(1500);
+                    StateCounter = 0;
+
+                }
+                case  9:{
+                    leftFront.setTargetPosition(-156);
+                    leftback.setTargetPosition(-948);
+                    rightFront.setTargetPosition(940);
+                    rightBack.setTargetPosition(135);
+                    leftFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftback.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightBack.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    rightFront.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    leftFront.setPower(1);
+                    leftback.setPower(1);
+                    rightFront.setPower(-1);
+                    rightBack.setPower(-1);
+
+                }
+            }
+
+        }
+    }
+}
