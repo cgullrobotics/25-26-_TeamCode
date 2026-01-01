@@ -1,0 +1,85 @@
+package org.firstinspires.ftc.teamcode;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+@TeleOp(name = "telemetry")
+
+public class telemetrywithresetencoders extends LinearOpMode{
+    private DcMotor leftFront, intake, leftback, rightFront, rightBack, shooter, turret;
+    private Servo angle, pwmLight;
+    private CRServo ballTransfer;
+    GoBildaPinpointDriver pinpoint;
+    private Limelight3A limelight;
+
+    @Override
+    public void runOpMode() throws InterruptedException {
+        leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        leftback = hardwareMap.get(DcMotor.class, "leftBack");
+        rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        rightBack = hardwareMap.get(DcMotor.class, "rightBack");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+        shooter = hardwareMap.get(DcMotor.class,"shooter");
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        angle = hardwareMap.get(Servo.class,"angle");
+        pwmLight = hardwareMap.get(Servo.class,"pwmLight");
+        ballTransfer = hardwareMap.get(CRServo.class,"ballTransfer");
+        limelight = hardwareMap.get(Limelight3A.class,"limelight");
+
+        pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+        pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        pinpoint.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.FORWARD);
+        pinpoint.initialize();
+        pinpoint.update();
+
+        limelight.setPollRateHz(100);
+        limelight.pipelineSwitch(1);
+        limelight.start();
+        leftFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        leftback.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightFront.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        rightBack.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        waitForStart();
+        while (opModeIsActive()) {
+
+
+            limelight();
+
+            telemetry.addData("leftfront",leftFront.getCurrentPosition());
+            telemetry.addData("rightfront",rightFront.getCurrentPosition());
+            telemetry.addData("leftback",leftback.getCurrentPosition());
+            telemetry.addData("rightback",rightBack.getCurrentPosition());
+            telemetry.addData("angle Pos",angle.getPosition());
+            telemetry.addData("Turret Pos",turret.getCurrentPosition());
+            telemetry.addData("Heading",pinpoint.getHeading(AngleUnit.DEGREES));
+
+            telemetry.update();
+        }
+
+    }
+    public void limelight(){
+        LLResult result = limelight.getLatestResult();
+        double tx = 0;
+        double ta = 0;
+        double targetArea = 0;
+
+        if (result !=null&& result.isValid()){
+            tx = result.getTx();
+            double ty = result.getTy();
+            ta = result.getTa();
+
+            telemetry.addData("Target X", tx);
+            telemetry.addData("Target Y", ty);
+            telemetry.addData("Target Area", ta);
+
+        } else {
+            telemetry.addData("limelight","No targets");
+        }
+    }
+}
