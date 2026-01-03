@@ -37,6 +37,8 @@ public class TeleOp extends LinearOpMode {
 
     double filteredRPM = 0;   // for smoothing
     double rpmAlpha = 0.20;   // smoothing factor (0–1)
+    double previousError = 0;
+    double integral = 0;
 
     @Override
     public void runOpMode(){
@@ -78,7 +80,7 @@ public class TeleOp extends LinearOpMode {
 
             driveTrain();
             intakeControl();
-            turretControl();
+           
             angleManualOverride();
             turretManualOverride();
             shooterControl();
@@ -222,10 +224,8 @@ public class TeleOp extends LinearOpMode {
 
 
 // Variables for PID
-        double previousError = 0;
-        double integral = 0;
 
-        double target = 0; // Desired tx value (centered on target)
+        double target = .2; // Desired tx value (centered on target)
 
 // Inside your loop:
         double error = target - tx;
@@ -278,16 +278,12 @@ public class TeleOp extends LinearOpMode {
         }
 
     }
-    public void turretManualOverride(){
-        if(gamepad1.left_trigger>.5){
-            turret.setPower(.8);
-        }
-        else if(gamepad1.right_trigger>.5){
-            turret.setPower(-.8);
-        }
-        else{
+    public void turretManualOverride() {
+
+        if (gamepad2.left_stick_x > .5){
             turret.setPower(gamepad2.left_stick_x);
-        }
+        }else {turretControl();}
+
     }
     public void robotShutdowns() {
         if (gamepad1.options && gamepad1.share) {
