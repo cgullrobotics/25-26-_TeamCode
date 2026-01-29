@@ -15,7 +15,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 public class TeleOp extends LinearOpMode {
     private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret;
     private DcMotorEx shooter,shooter2;
-    private Servo angle,pwmLight,PWMLight2,swingbar;
+    private Servo angle,pwmLight,pwmLight2,swingbar;
     private CRServo ballTransfer;
     private DigitalChannel distance;
     private Limelight3A limelight;
@@ -33,10 +33,11 @@ public class TeleOp extends LinearOpMode {
     double rpmAlpha = 0.20;   // smoothing factor (0–1)
     double previousError = 0;
     double integral = 0;
-    double SHOOTER_MIN_RPM = 1200; // tune this
-
-
-
+    double SHOOTER_MIN_RPM = 500; // tune this
+    static final int LEFT_POS = -962;
+    static final int RIGHT_POS = 955;
+    static final int CENTER_POS = 0;
+    double targetPos = LEFT_POS;
 
     @Override
     public void runOpMode(){
@@ -53,7 +54,7 @@ public class TeleOp extends LinearOpMode {
         ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
         distance = hardwareMap.get(DigitalChannel.class,"distance");
         limelight = hardwareMap.get(Limelight3A.class,"limelight");
-        PWMLight2 = hardwareMap.get(Servo.class,"PWMLight2");
+        pwmLight2 = hardwareMap.get(Servo.class,"pwmLight2");
         swingbar = hardwareMap.get(Servo.class,"swingbar");
 
         distance.setMode(DigitalChannel.Mode.INPUT);
@@ -73,6 +74,7 @@ public class TeleOp extends LinearOpMode {
         intake.setDirection(DcMotor.Direction.REVERSE);
         shooter.setDirection(DcMotor.Direction.FORWARD);
         shooter2.setDirection(DcMotor.Direction.REVERSE);
+        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
 
         waitForStart();
         runtime.reset();
@@ -162,19 +164,11 @@ public class TeleOp extends LinearOpMode {
 
         return stateHigh;
     }
-
     public void shooterControl(){
-
-
-
-
             // ---- Constants ----
             final double COUNTS_PER_REV = 28;
             final double MIN_RPM = 2500;
-            final double MAX_RPM = 3950;
-
-
-
+            final double MAX_RPM = 2920;
 
             // ---- STOP shooter ----
             if (gamepad2.x) {
@@ -196,7 +190,7 @@ public class TeleOp extends LinearOpMode {
             }
             else if (gamepad2.b) {
                 // Far preset
-                targetRPM = 2750;
+                targetRPM = 2990;
             }
             else if (hasTarget) {
                 // Limelight auto RPM
@@ -233,12 +227,9 @@ public class TeleOp extends LinearOpMode {
             telemetry.addData("Target RPM", targetRPM);
             telemetry.addData("Shooter RPM", currentRPM);
             telemetry.addData("Limelight", hasTarget ? "Locked" : "No Target");
-
-
-
-
     }
     public void turretControl(){
+        turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         LLResult result = limelight.getLatestResult();
         double tx = 0;
         double ta = 0;
@@ -301,15 +292,23 @@ public class TeleOp extends LinearOpMode {
         }
         if (gamepad2.y){
             angle.setPosition(.556);
-        } else if (gamepad2.a) {
+        }
+        else if (gamepad2.a) {
             angle.setPosition(.556);
-
         }
     }
     public void turretManualOverride() {
+       // if (gamepad1.x){
+            //Snap Control
+           //turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            //turret.setTargetPosition((int) targetPos);
+            //turret.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+            //turret.setPower(0.6); // adjust speed
+        //}
         if (Math.abs(gamepad2.left_stick_x) > 0.15) {
             turret.setPower(gamepad2.left_stick_x);
-        } else {
+        }
+        else {
             turretControl();
         }
     }
@@ -318,11 +317,8 @@ public class TeleOp extends LinearOpMode {
         if (gamepad1.options && gamepad1.share) {
             terminateOpModeNow();
         }
-
-
-
         if (timeLeft < 10) {
-            PWMLight2.setPosition(.611);
+            pwmLight2.setPosition(.611);
         }
 
     }}
