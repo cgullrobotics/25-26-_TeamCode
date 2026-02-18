@@ -10,11 +10,14 @@ import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+
 @com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOp2025", group="Linear OpMode")
 
 public class TeleOp extends LinearOpMode {
     private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret;
     private DcMotorEx shooter,shooter2;
+    private GoBildaPinpointDriver odo;
     private Servo angle,pwmLight,pwmLight2,swingbar;
     private CRServo ballTransfer;
     private DigitalChannel distance;
@@ -41,6 +44,7 @@ public class TeleOp extends LinearOpMode {
 
     @Override
     public void runOpMode(){
+        // ================= HARDWARE INIT =================
         leftFront = hardwareMap.get(DcMotor.class, "leftFront");
         leftBack = hardwareMap.get(DcMotor.class, "leftBack");
         rightBack = hardwareMap.get(DcMotor.class, "rightBack");
@@ -56,6 +60,8 @@ public class TeleOp extends LinearOpMode {
         limelight = hardwareMap.get(Limelight3A.class,"limelight");
         pwmLight2 = hardwareMap.get(Servo.class,"pwmLight2");
         swingbar = hardwareMap.get(Servo.class,"swingbar");
+        odo = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+        odo.resetPosAndIMU();
 
         distance.setMode(DigitalChannel.Mode.INPUT);
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -75,7 +81,11 @@ public class TeleOp extends LinearOpMode {
         shooter.setDirection(DcMotor.Direction.FORWARD);
         shooter2.setDirection(DcMotor.Direction.REVERSE);
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        odo.resetPosAndIMU();
 
+
+
+        // ================= WAIT FOR START =================
         waitForStart();
         runtime.reset();
 
@@ -96,6 +106,7 @@ public class TeleOp extends LinearOpMode {
         }
     }
     public void driveTrain(){
+        // Update odometry
         double x = -gamepad1.left_stick_y;
         double y = gamepad1.left_stick_x;
         double z = (gamepad1.right_stick_x);
@@ -126,6 +137,7 @@ public class TeleOp extends LinearOpMode {
             rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
             leftBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
         }
+
     }
     public boolean shooterRunning() {
         double rpm = (shooter.getVelocity() / 28.0) * 60.0;
@@ -167,7 +179,9 @@ public class TeleOp extends LinearOpMode {
     public void shooterControl(){
             // ---- Constants ----
             final double COUNTS_PER_REV = 28;
-            final double MIN_RPM = 2500;
+            final double MIN_RPM = 2400;
+
+
             final double MAX_RPM = 2920;
 
             // ---- STOP shooter ----
@@ -291,7 +305,7 @@ public class TeleOp extends LinearOpMode {
             angle.setPosition(angle.getPosition()-.001);
         }
         if (gamepad2.y){
-            angle.setPosition(.556);
+            angle.setPosition(.656);
         }
         else if (gamepad2.a) {
             angle.setPosition(.556);
