@@ -18,7 +18,355 @@ public class TeleOpFieldCentric extends LinearOpMode {
     private Limelight3A limelight;
     GoBildaPinpointDriver pinpoint;
 
+    @Overridepackage org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
+import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.util.ElapsedTime;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+
+@com.qualcomm.robotcore.eventloop.opmode.TeleOp(name="TeleOpfieldcentric", group="Linear OpMode")
+@Disabled
+public class telopfieldcentric extends LinearOpMode {
+    private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret;
+    private DcMotorEx shooter;
+    private Servo angle,pwmLight;
+    private CRServo ballTransfer;
+    private DigitalChannel distance;
+    private Limelight3A limelight;
+    private ElapsedTime runtime = new ElapsedTime();
+    private IMU imu;
+    private double headingOffset = 0;
+    private boolean snapActive = false;
+    private double snapTarget = 0.0;
+
+
+    ElapsedTime timer = new ElapsedTime();
+    double countdownSeconds = 120.0;
+    double targetRPM=0;
+    double m =-500;
+    double b =7050;
+    private double lastTa;
+
     @Override
+    public void runOpMode() {
+        leftFront = hardwareMap.get(DcMotor.class, "leftFront");
+        leftBack = hardwareMap.get(DcMotor.class, "leftBack");
+        rightBack = hardwareMap.get(DcMotor.class, "rightBack");
+        rightFront = hardwareMap.get(DcMotor.class, "rightFront");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+        shooter = hardwareMap.get(DcMotorEx.class, "shooter");
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        angle = hardwareMap.get(Servo.class, "angle");
+        pwmLight = hardwareMap.get(Servo.class, "pwmLight");
+        ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
+        distance = hardwareMap.get(DigitalChannel.class, "distance");
+        limelight = hardwareMap.get(Limelight3A.class, "limelight");
+        imu = hardwareMap.get(IMU.class, "imu");
+
+
+        distance.setMode(DigitalChannel.Mode.INPUT);
+        shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        limelight.setPollRateHz(100);
+        limelight.pipelineSwitch(1);
+        limelight.start();
+        telemetry.addData(">", "robot ready . press play");
+        telemetry.update();
+
+
+        leftFront.setDirection(DcMotor.Direction.FORWARD);
+        leftBack.setDirection(DcMotor.Direction.FORWARD);
+        rightFront.setDirection(DcMotor.Direction.REVERSE);
+        rightBack.setDirection(DcMotor.Direction.REVERSE);
+        intake.setDirection(DcMotor.Direction.REVERSE);
+        RevHubOrientationOnRobot orientation = null;
+        IMU.Parameters parameters = new IMU.Parameters(orientation);
+
+
+        imu.initialize(parameters);
+
+        orientation = new RevHubOrientationOnRobot(
+                RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
+                RevHubOrientationOnRobot.UsbFacingDirection.UP
+        );
+
+        imu.initialize(new IMU.Parameters(orientation));
+
+        telemetry.addData("imu", "Ready");
+        telemetry.update();
+
+
+        waitForStart();
+        runtime.reset();
+        resetHeading();
+
+
+        while (opModeIsActive()) {
+
+
+            driveTrain();
+            intakeControl();
+            turretControl();
+            angleManualOverride();
+            turretManualOverride();
+            shooterControl();
+            robotShutdowns();
+            double timeLeft = countdownSeconds - timer.seconds();
+
+            if (timeLeft < 0) timeLeft = 0;  // prevent negative numbers
+
+            telemetry.addData("Time Left", timeLeft);
+
+            telemetry.update();
+
+        }
+    }
+    private double getHeading() {
+        return imu.getRobotOrientation(
+                AxesReference.INTRINSIC,
+                AxesOrder.ZYX,
+                AngleUnit.RADIANS
+        ).firstAngle - headingOffset;
+    }
+
+    private void resetHeading() {
+        headingOffset = imu.getRobotOrientation(
+                AxesReference.INTRINSIC,
+                AxesOrder.ZYX,
+                AngleUnit.RADIANS
+        ).firstAngle;
+    }
+    private double angleWrap(double radians) {
+        while (radians > Math.PI)  radians -= 2 * Math.PI;
+        while (radians < -Math.PI) radians += 2 * Math.PI;
+        return radians;
+    }
+
+    public void driveTrain(){
+        double y = -gamepad1.left_stick_y; // forward
+        double x = gamepad1.left_stick_x;  // strafe
+        double rx = gamepad1.right_stick_x; // rotate
+
+        // Get robot heading
+        double botHeading = getHeading();
+
+        // Rotate joystick by negative heading
+        double rotX = x * Math.cos(-botHeading) - y * Math.sin(-botHeading);
+        double rotY = x * Math.sin(-botHeading) + y * Math.cos(-botHeading);
+
+        // Optional: strafe correction
+        rotX *= 1.1;
+
+        // Motor power calculations
+        double denominator = Math.max(Math.abs(rotY) + Math.abs(rotX) + Math.abs(rx), 1);
+
+        double leftFrontPower = (rotY + rotX + rx) / denominator;
+        double leftBackPower  = (rotY - rotX + rx) / denominator;
+        double rightFrontPower = (rotY - rotX - rx) / denominator;
+        double rightBackPower  = (rotY + rotX - rx) / denominator;
+
+        leftFront.setPower(leftFrontPower);
+        leftBack.setPower(leftBackPower);
+        rightFront.setPower(rightFrontPower);
+        rightBack.setPower(rightBackPower);
+
+        // Reset field heading
+        if (gamepad1.options) {
+            resetHeading();
+        }
+
+        telemetry.addData("Heading (deg)", Math.toDegrees(botHeading));
+
+
+
+
+        if(gamepad1.dpad_up){
+            limelight.pipelineSwitch(0);
+        }
+        if(gamepad1.dpad_down){
+            limelight.pipelineSwitch(1);
+        }
+    }
+    public void intakeControl(){
+        boolean stateHigh = distance.getState();
+        boolean detected = stateHigh;
+
+        if (gamepad1.left_bumper){
+            intake.setPower(0);
+            ballTransfer.setPower(0);
+
+        }
+        else if (gamepad1.right_bumper){
+            intake.setPower(-1);
+            ballTransfer.setPower(-.5);
+        }
+        else if (gamepad1.y){
+            intake.setPower(1);
+        }
+
+        if (gamepad2.right_bumper){
+            ballTransfer.setPower(-.5);
+            intake.setPower(-1);
+        } else if (gamepad2.left_bumper) {
+            ballTransfer.setPower(.5);
+        } else {
+            ballTransfer.setPower(0);
+
+        }
+    }
+
+    public void shooterControl(){
+
+
+            if (gamepad2.x) {
+                targetRPM = 0;
+            } else if (gamepad2.a) {
+                if (targetRPM < 2100) {
+                    targetRPM = 2300;
+                    //angle.setPosition(.1767);
+                }
+            } else if (gamepad2.b) {
+                if (targetRPM < 2850) {
+                    targetRPM = 2850;
+                    angle.setPosition(.5556);
+                }
+            }
+            double COUNTS_PER_REVOLUTION = 28; // Example: Adjust for your specific motor
+            double ticksPerSecond = (targetRPM / 60.0) * COUNTS_PER_REVOLUTION;
+            shooter.setVelocity(ticksPerSecond);
+
+            boolean stateHigh = distance.getState();
+            boolean detected = stateHigh;
+            if (detected) {
+                pwmLight.setPosition(.5);
+            } else if (shooter.getVelocity() > 1325) {
+                pwmLight.setPosition(.611);
+            } else if (shooter.getVelocity() > 930) {
+                pwmLight.setPosition(.611);
+            } else {
+                pwmLight.setPosition(0);
+            }
+
+
+    }
+    public void turretControl(){
+        LLResult result = limelight.getLatestResult();
+        double tx = 0;
+        double ta = 0;
+        double targetArea = 0;
+        double motorPower = 0;
+
+
+        if (result !=null&& result.isValid()){
+            tx = result.getTx();
+            double ty = result.getTy();
+            ta = result.getTa();
+
+            telemetry.addData("Target X", tx);
+            telemetry.addData("Target Y", ty);
+            telemetry.addData("Target Area", ta);
+
+        }
+        else {
+            telemetry.addData("limelight","No targets");
+        }
+
+        double kP = 0.8;
+        double kI = .2;
+        double kD = 0.008;
+
+// Variables for PID
+        double previousError = 0;
+        double integral = 0;
+
+        double target = 0; // Desired tx value (centered on target)
+
+// Inside your loop:
+        double error = target - tx;
+
+// Integral term (only accumulate when error is small to avoid windup)
+        if (Math.abs(error) < 10) {
+            integral += error;
+        } else {
+            integral = 0.0;
+        }
+
+// Derivative term
+        double derivative = error - previousError;
+        previousError = error;
+
+// PID output
+        double turnPower = (kP * error) + (kI * integral) + (kD * derivative);
+
+// Clamp power to avoid excessive speed
+        turnPower = Math.max(-.7, Math.min(.7, turnPower));
+        if (Math.abs(error) < .8) {  // 1 degree or pixel, depending on tx units
+            turnPower = .04;
+        }
+
+// Stop condition: target centered and close enough
+        if (Math.abs(error) < 0 && ta > .4) {
+            turret.setPower(0);
+            telemetry.addData("Status", "Aligned!");
+        } else {
+            turret.setPower(-turnPower);
+        }
+
+        telemetry.addData("Error", error);
+        telemetry.addData("Turn Power", turnPower);
+        telemetry.addData("angle",angle.getPosition());
+        telemetry.update();
+
+
+
+
+    }
+
+
+    public void angleManualOverride(){
+        if (gamepad2.left_trigger>.5){
+            angle.setPosition(angle.getPosition()+.001);
+        }
+        else if (gamepad2.right_trigger>.5){
+            angle.setPosition(angle.getPosition()-.001);
+        }
+
+    }
+    public void turretManualOverride(){
+        if(gamepad1.left_trigger>.5){
+            turret.setPower(.8);
+        }
+        else if(gamepad1.right_trigger>.5){
+            turret.setPower(-.8);
+        }
+        else{
+            turret.setPower(gamepad2.left_stick_x);
+        }
+    }
+    public void robotShutdowns(){
+        if (gamepad1.options&&gamepad1.share){
+            terminateOpModeNow();
+        }
+        double timeLeft = countdownSeconds - timer.seconds();
+        if (timeLeft<0){
+
+
+        }
+    }
+}
     public void runOpMode(){
         leftFront = hardwareMap.get(DcMotor.class, "leftFront");
         leftBack = hardwareMap.get(DcMotor.class, "leftBack");
