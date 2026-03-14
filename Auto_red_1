@@ -1,0 +1,235 @@
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.*;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+
+@Autonomous(name="Auto_red_1")
+public class Auto_red_1 extends LinearOpMode {
+
+    // Drive motors
+    private DcMotorEx leftFront, leftBack, rightFront, rightBack;
+
+    // Mechanisms
+    private DcMotorEx shooter, shooter2;
+    private DcMotor turret;
+    private DcMotor intake;
+    private Servo angle;
+    private CRServo ballTransfer;
+
+    private Limelight3A limelight;
+    private GoBildaPinpointDriver odo;
+
+
+    // Heading lock variables
+    private double targetHeading = 0;
+    private final double kP_heading = 0.001;  // tweak for your robot
+
+    @Override
+    public void runOpMode() {
+
+        initHardware();
+        odo.resetPosAndIMU();
+
+        // ---------------- INIT LOOP ----------------
+        while (!isStarted() && !isStopRequested()) {
+            odo.update();
+            telemetry.addData("X", odo.getPosX(DistanceUnit.CM));
+            telemetry.addData("Y", odo.getPosY(DistanceUnit.CM));
+            telemetry.addData("Heading", odo.getHeading(AngleUnit.DEGREES));
+            telemetry.addLine("Ready.");
+            telemetry.update();
+
+            // Example turret preset in init
+            if (gamepad1.a) {
+                turret.setTargetPosition(-684);
+                turret.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                turret.setPower(0.3);
+                angle.setPosition(.65);
+            }
+        }
+
+        waitForStart();
+        if (isStopRequested()) return;
+
+        // ---------------- AUTO SEQUENCE ----------------
+
+     odo.update();
+        targetHeading = 0;
+        targetHeading =odo.getHeading(AngleUnit.DEGREES) ; // lock heading from start
+        telemetry.addData("X", odo.getPosX(DistanceUnit.INCH));
+        telemetry.addData("Y", odo.getPosY(DistanceUnit.INCH));
+        telemetry.addData("Heading", odo.getHeading(AngleUnit.DEGREES));
+        telemetry.addData("Target", targetHeading);
+        odo.update();
+
+        telemetry.update();
+
+        // Spin up shooter and fire first 3 balls
+        driveToPoint(0, -13.31, 0.04);
+        spinUpShooter(3100);
+        sleep(1000);
+        fireSequence();
+        // Move forward with heading lock
+        setHeading(.93);
+        driveToPoint(24.09, -28.62, 0.04); // adjust units and kP as needed
+        intakeon();
+        driveToPoint(47.44, -28.52, 0.01);
+        intakeoff();// adjust units and kP as needed
+        driveToPoint(-2.02, -23.65, 0.02);
+        fireSequence();
+        driveToPoint(14.05, -64.62, 0.04);
+        intakeon();
+        driveToPoint(40.98, -64.76, 0.01);
+        intakeon();
+        driveToPoint(5.94, -14.26, 0.06);
+        // Fire second batch
+
+        stopDrive();
+    }
+
+    // ================= HARDWARE INIT =================
+    private void initHardware() {
+        leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
+        leftBack = hardwareMap.get(DcMotorEx.class, "leftBack");
+        rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
+        rightBack = hardwareMap.get(DcMotorEx.class, "rightBack");
+
+        shooter = hardwareMap.get(DcMotorEx.class,"shooter");
+        shooter2 = hardwareMap.get(DcMotorEx.class,"shooter2");
+
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+
+        angle = hardwareMap.get(Servo.class,"angle");
+        ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
+
+        limelight = hardwareMap.get(Limelight3A.class,"limelight");
+        odo = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+        leftFront.setDirection(DcMotor.Direction.FORWARD);
+        leftBack.setDirection(DcMotor.Direction.FORWARD);
+        rightFront.setDirection(DcMotor.Direction.REVERSE);
+        rightBack.setDirection(DcMotor.Direction.REVERSE);
+
+        shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        shooter2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        shooter2.setDirection(DcMotor.Direction.REVERSE);
+        angle.setPosition(.7);
+        odo.setOffsets(0, 0); // or your actual pod offsets
+        odo.setEncoderDirections(
+                GoBildaPinpointDriver.EncoderDirection.FORWARD,
+                GoBildaPinpointDriver.EncoderDirection.FORWARD
+        );
+
+        odo.resetPosAndIMU();
+    }
+
+    // ================= DRIVE TO POINT WITH HEADING LOCK =================
+    private void driveToPoint(double targetX_mm, double targetY_mm, double kP) {
+
+        while (opModeIsActive()) {
+            odo.update();
+
+            double currentX = odo.getPosX(DistanceUnit.INCH);
+            double currentY = odo.getPosY(DistanceUnit.INCH);
+
+            double errorX = targetX_mm - currentX;
+            double errorY = targetY_mm - currentY;
+
+            double distance = Math.hypot(errorX, errorY);
+            if (distance < 20) break;  // within 2cm
+
+            double forward = errorX * kP;
+            double strafe  = errorY * kP;
+
+            mecanumDrive(forward, strafe, 0);
+        }
+
+        stopDrive();
+    }
+
+    // ================= MECANUM DRIVE WITH HEADING LOCK =================
+    private void mecanumDrive(double forward, double strafe, double turn) {
+
+        // heading correction
+        double currentHeading = odo.getHeading(AngleUnit.DEGREES);
+        double headingError = targetHeading - currentHeading;
+
+        // Wrap heading properly
+        while (headingError > 180) headingError -= 360;
+        while (headingError < -180) headingError += 360;
+
+        double turnPower = 0;
+
+        // Only correct if we're off by more than 1 degree
+        if (Math.abs(headingError) > .1) {
+            turnPower = headingError * kP_heading;
+        }
+
+        double lf = forward - strafe + turnPower;
+        double rf = forward - strafe - turnPower;
+        double lb = forward + strafe + turnPower;
+        double rb = forward + strafe - turnPower;
+
+        double max = Math.max(
+                Math.max(Math.abs(lf), Math.abs(rf)),
+                Math.max(Math.abs(lb), Math.abs(rb))
+        );
+
+        if (max > 1) {
+            lf /= max;
+            rf /= max;
+            lb /= max;
+            rb /= max;
+        }
+
+        leftFront.setPower(lf);
+        rightFront.setPower(rf);
+        leftBack.setPower(lb);
+        rightBack.setPower(rb);
+    }
+
+    private void stopDrive() {
+        mecanumDrive(0,0,0);
+    }
+
+    // ================= SHOOTER =================
+    private void spinUpShooter(double rpm) {
+        double ticksPerSecond = (rpm / 60.0) * 26;
+        shooter.setVelocity(ticksPerSecond);
+        shooter2.setVelocity(ticksPerSecond);
+
+    }
+
+    private void fireSequence() {
+        intake.setPower(1);
+        sleep(1000);
+        ballTransfer.setPower(-1);
+        sleep(900);
+        ballTransfer.setPower(0);
+        sleep(1000);
+        ballTransfer.setPower(-1);
+        sleep(900);
+        ballTransfer.setPower(0);
+        sleep(1000);
+        ballTransfer.setPower(-1);
+        sleep(1200);
+        ballTransfer.setPower(0);
+    }
+private void intakeon(){
+        intake.setPower(1);
+        ballTransfer.setPower(-1);
+
+}
+private void intakeoff(){
+        intake.setPower(0);
+        ballTransfer.setPower(0);
+
+}
+    private void setHeading(double heading){
+        targetHeading = heading;
+    }}
