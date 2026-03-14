@@ -1,0 +1,363 @@
+package org.firstinspires.ftc.teamcode;
+
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.canvas.Canvas;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.qualcomm.hardware.limelightvision.LLResult;
+import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.Servo;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+
+@Autonomous(name="Auto_bluegoal_2")
+public class Auto_bluegoal_2 extends LinearOpMode {
+
+    // Drive motors
+    private DcMotorEx leftFront, leftBack, rightFront, rightBack;
+
+    // Mechanisms
+    private DcMotorEx shooter, shooter2;
+    private DcMotor turret;
+    private DcMotor intake;
+    private Servo angle;
+    private CRServo ballTransfer;
+    private FtcDashboard dashboard;
+
+
+    private Limelight3A limelight;
+    private GoBildaPinpointDriver odo;
+
+    // Heading lock variables
+    private double targetHeading = 0;
+    private final double kP_heading = 0.002;  // tweak for your robot
+    double previousError = 0;
+    double integral = 0;
+    double kP = .03;
+    double kI =0;
+    double kD = 0.002;
+    private boolean limelightLock = false;  // Enable/disable auto-locking
+    private final double kP_limelight = 0.006; // PID for heading correction via Limelight
+
+
+    @Override
+    public void runOpMode() {
+
+        initHardware();
+        odo.resetPosAndIMU();
+        // ---------------- INIT LOOP ----------------
+        while (!isStarted() && !isStopRequested()) {
+            odo.update();
+            telemetry.addData("X", odo.getPosX(DistanceUnit.INCH));
+            telemetry.addData("Y", odo.getPosY(DistanceUnit.INCH));
+            telemetry.addData("Heading", odo.getHeading(AngleUnit.DEGREES));
+            telemetry.addLine("Ready.");
+            telemetry.update();
+
+            // Example turret preset in init
+            if (gamepad1.a) {
+                turret.setTargetPosition(-500);
+                turret.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                turret.setPower(0.3);
+                angle.setPosition(.65);
+            }
+        }
+
+        waitForStart();
+        if (isStopRequested()) return;
+
+        // ---------------- AUTO SEQUENCE ----------------
+
+        targetHeading =odo.getHeading(AngleUnit.DEGREES) ; // lock heading from start
+        telemetry.addData("X", odo.getPosX(DistanceUnit.INCH));
+        telemetry.addData("Y", odo.getPosY(DistanceUnit.INCH));
+        telemetry.addData("Heading", odo.getHeading(AngleUnit.DEGREES));
+        telemetry.addData("Target", targetHeading);
+        odo.update();
+        telemetry.update();
+        intakeidle();
+
+        // Spin up shooter and fire first 3 ball
+        spinUpShooter(2410);
+        sleep(1500);
+        // Move forward with heading lock
+        driveToPoint(-12.52, -29.33, 0.06);// adjust units and kP as needed
+        limelightLock = true;
+        fireSequence();
+        driveToPoint(-12.61, -61.48, 0.021);
+        intakeon();
+        driveToPoint(11.61,-50.48,0.02);
+        intakeidle();
+        driveToPoint(-12.52, -29.33, 0.022);
+        fireSequence();
+        driveToPoint(-11.61, -90.48, 0.012);
+        intakeon();
+        driveToPoint(11.61, -90.48, 0.021);
+        // Fire second batch
+
+        stopDrive();
+    }
+
+    // ================= HARDWARE INIT =================
+    private void initHardware() {
+        leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
+        leftBack = hardwareMap.get(DcMotorEx.class, "leftBack");
+        rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
+        rightBack = hardwareMap.get(DcMotorEx.class, "rightBack");
+
+        shooter = hardwareMap.get(DcMotorEx.class,"shooter");
+        shooter2 = hardwareMap.get(DcMotorEx.class,"shooter2");
+        limelight = hardwareMap.get(Limelight3A.class,"limelight");
+
+        turret = hardwareMap.get(DcMotor.class, "turret");
+        intake = hardwareMap.get(DcMotor.class, "intake");
+
+        angle = hardwareMap.get(Servo.class,"angle");
+        ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
+
+        limelight = hardwareMap.get(Limelight3A.class,"limelight");
+        odo = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+        leftFront.setDirection(DcMotor.Direction.FORWARD);
+        leftBack.setDirection(DcMotor.Direction.FORWARD);
+        rightFront.setDirection(DcMotor.Direction.REVERSE);
+        rightBack.setDirection(DcMotor.Direction.REVERSE);
+
+        shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        shooter2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        shooter2.setDirection(DcMotor.Direction.REVERSE);
+        turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        angle.setPosition(.7);
+        odo.setOffsets(5, 4); // or your actual pod offsets
+        odo.setEncoderDirections(
+                GoBildaPinpointDriver.EncoderDirection.FORWARD,
+                GoBildaPinpointDriver.EncoderDirection.FORWARD
+        );
+
+
+        dashboard = FtcDashboard.getInstance();
+
+
+        limelight.setPollRateHz(100);
+        limelight.pipelineSwitch(0);
+        limelight.start();
+        telemetry.addData(">", "robot ready . press play");
+        telemetry.update();
+    }
+
+    // ================= DRIVE TO POINT WITH HEADING LOCK =================
+    private void driveToPoint(double targetX_INCH, double targetY_INCH, double kP) {
+        double kD_drive = 0.005;   // damping term
+        double lastErrorX = 5.0;
+        double lastErrorY = 0;
+
+        double timeout = 3.0; // seconds safety
+        double startTime = getRuntime();
+
+        while (opModeIsActive()) {
+            if (getRuntime() - startTime > timeout) break;
+
+            odo.update();
+
+            double currentX = odo.getPosX(DistanceUnit.INCH);
+            double currentY = odo.getPosY(DistanceUnit.INCH);
+
+            double errorX = targetX_INCH - currentX;
+            double errorY = targetY_INCH - currentY;
+
+            double distance = Math.hypot(errorX, errorY);
+
+            if (distance < 0.75) break;  // tighter tolerance
+
+            // ===== PD CONTROL =====
+            double derivativeX = errorX - lastErrorX;
+            double derivativeY = errorY - lastErrorY;
+
+            lastErrorX = errorX;
+            lastErrorY = errorY;
+
+            double forward = (errorX * kP) + (derivativeX * kD_drive);
+            double strafe  = (errorY * kP) + (derivativeY * kD_drive);
+
+            // ===== FIELD CENTRIC ROTATION =====
+            double headingRad = Math.toRadians(odo.getHeading(AngleUnit.RADIANS));
+            double tempForward = forward * Math.cos(-headingRad) - strafe * Math.sin(-headingRad);
+            double tempStrafe  = forward * Math.sin(-headingRad) + strafe * Math.cos(-headingRad);
+
+            forward = tempForward;
+            strafe  = tempStrafe;
+
+            // ===== SLOW DOWN ZONE =====
+            double scale = Math.min(.75, distance / 10.0);
+            forward *= scale;
+            strafe  *= scale;
+            // ===== MIN POWER FLOOR =====
+            double minPower = 0.08;
+            if (Math.abs(forward) < minPower && Math.abs(forward) > 0.01)
+                forward = Math.signum(forward) * minPower;
+
+            if (Math.abs(strafe) < minPower && Math.abs(strafe) > 0.01)
+                strafe = Math.signum(strafe) * minPower;
+
+            // ===== HEADING / LIMELIGHT LOCK =====
+            double turnPower;
+
+            if (limelightLock) {
+                LLResult result = limelight.getLatestResult();
+                if (result != null && result.isValid()) {
+                    double tx = result.getTx();
+                    turnPower = tx * kP_limelight;
+                } else {
+                    turnPower = 0;
+                }
+            } else {
+                double currentHeading = odo.getHeading(AngleUnit.DEGREES);
+                double headingError = targetHeading - currentHeading;
+
+                while (headingError > 180) headingError -= 360;
+                while (headingError < -180) headingError += 360;
+
+                turnPower = headingError * kP_heading;
+            }
+
+            // Clamp
+            turnPower = Math.max(-0.9, Math.min(0.9, turnPower));
+
+            mecanumDrive(forward, strafe, turnPower);
+
+            telemetry.addData("TargetX", targetX_INCH);
+            telemetry.addData("TargetY", targetY_INCH);
+            telemetry.addData("Error", distance);
+            telemetry.update();
+            TelemetryPacket packet = new TelemetryPacket();
+            Canvas field = packet.fieldOverlay();
+
+// Draw robot position
+            double robotX = currentX;
+            double robotY = currentY;
+            double robotHeading = odo.getHeading(AngleUnit.DEGREES);
+
+// Draw robot as circle
+            field.setStroke("blue");
+            field.strokeCircle(robotX, robotY, 9);
+
+// Draw heading line
+            double headingX = robotX + 12 * Math.cos(headingRad);
+            double headingY = robotY + 12 * Math.sin(headingRad);
+            field.strokeLine(robotX, robotY, headingX, headingY);
+
+// Draw target point
+            field.setStroke("red");
+            field.strokeCircle(targetX_INCH, targetY_INCH, 5);
+            packet.put("X", currentX);
+            packet.put("Y", currentY);
+            packet.put("HeadingDeg", odo.getHeading(AngleUnit.DEGREES));
+            packet.put("TargetX", targetX_INCH);
+            packet.put("TargetY", targetY_INCH);
+            packet.put("DistanceError", distance);
+            packet.put("ForwardPower", forward);
+            packet.put("StrafePower", strafe);
+            packet.put("turretpower",turnPower);
+
+// Draw line to target
+            field.strokeLine(robotX, robotY, targetX_INCH, targetY_INCH);
+
+// Send packet
+            dashboard.sendTelemetryPacket(packet);
+
+
+        }
+
+        stopDrive();
+    }
+
+    // ================= MECANUM DRIVE WITH HEADING LOCK =================
+    private void mecanumDrive(double forward, double strafe, double turn) {
+
+        // heading correction
+        double currentHeading = odo.getHeading(AngleUnit.DEGREES);
+        double headingError = targetHeading - currentHeading;
+
+        // Wrap heading properly
+        while (headingError > 180) headingError -= 360;
+        while (headingError < -180) headingError += 360;
+
+        double turnPower = 1;
+
+        // Only correct if we're off by more than 1 degree
+        if (Math.abs(headingError) > .001) {
+            turnPower = headingError * kP_heading;
+        }
+
+        double lf = forward - strafe + turnPower;
+        double rf = forward - strafe - turnPower;
+        double lb = forward + strafe + turnPower;
+        double rb = forward + strafe - turnPower;
+
+        double max = Math.max(
+                Math.max(Math.abs(lf), Math.abs(rf)),
+                Math.max(Math.abs(lb), Math.abs(rb))
+        );
+
+        if (max > 1) {
+            lf /= max;
+            rf /= max;
+            lb /= max;
+            rb /= max;
+        }
+
+        leftFront.setPower(lf);
+        rightFront.setPower(rf);
+        leftBack.setPower(lb);
+        rightBack.setPower(rb);
+    }
+
+    private void stopDrive() {
+        mecanumDrive(0,0,0);
+    }
+
+    // ================= SHOOTER =================
+    private void spinUpShooter(double rpm) {
+        double ticksPerSecond = (rpm / 60.0) * 28;
+        shooter.setVelocity(ticksPerSecond);
+        shooter2.setVelocity(ticksPerSecond);
+        sleep(1500); // allow spin up
+    }
+
+    private void fireSequence() {
+        intake.setPower(1);
+        sleep(1100);
+        ballTransfer.setPower(-1);
+        sleep(900);
+        ballTransfer.setPower(0);
+        sleep(1000);
+        ballTransfer.setPower(-1);
+        sleep(900);
+        ballTransfer.setPower(0);
+        sleep(1000);
+        ballTransfer.setPower(-1);
+        sleep(1000);
+        ballTransfer.setPower(0);
+    }
+private void intakeon(){
+        intake.setPower(1);
+        ballTransfer.setPower(-.15);
+
+
+}
+private void intakeoff(){
+        intake.setPower(0);
+        ballTransfer.setPower(0);
+
+}
+    private void intakeidle(){
+        intake.setPower(.7);
+
+
+
+    }
+}
