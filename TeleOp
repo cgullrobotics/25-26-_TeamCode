@@ -1,11 +1,13 @@
 package org.firstinspires.ftc.teamcode;
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.canvas.Canvas;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.CRServo;
-import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -17,10 +19,10 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 public class TeleOp extends LinearOpMode {
     private DcMotor leftFront,leftBack,rightFront,rightBack,intake,turret;
     private DcMotorEx shooter,shooter2;
-    private GoBildaPinpointDriver odo;
-    private Servo angle,pwmLight,pwmLight2,swingbar;
+
+    private Servo angle;
     private CRServo ballTransfer;
-    private DigitalChannel distance;
+
     private Limelight3A limelight;
     private ElapsedTime runtime = new ElapsedTime();
     ElapsedTime timer = new ElapsedTime();
@@ -33,14 +35,15 @@ public class TeleOp extends LinearOpMode {
     double kI =0;
     double kD = 0.002;
     double filteredRPM = 0;   // for smoothing
-    double rpmAlpha = 0.20;   // smoothing factor (0–1)
+    double rpmAlpha = 0.30;   // smoothing factor (0–1)
     double previousError = 0;
     double integral = 0;
-    double SHOOTER_MIN_RPM = 500; // tune this
+    double SHOOTER_MIN_RPM = 1420; // tune this
     static final int LEFT_POS = -962;
     static final int RIGHT_POS = 955;
     static final int CENTER_POS = 0;
     double targetPos = LEFT_POS;
+    private FtcDashboard dashboard;
 
     @Override
     public void runOpMode(){
@@ -54,16 +57,14 @@ public class TeleOp extends LinearOpMode {
         shooter2 = hardwareMap.get(DcMotorEx.class,"shooter2");
         turret = hardwareMap.get(DcMotor.class, "turret");
         angle = hardwareMap.get(Servo.class,"angle");
-        pwmLight = hardwareMap.get(Servo.class,"pwmLight");
-        ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
-        distance = hardwareMap.get(DigitalChannel.class,"distance");
-        limelight = hardwareMap.get(Limelight3A.class,"limelight");
-        pwmLight2 = hardwareMap.get(Servo.class,"pwmLight2");
-        swingbar = hardwareMap.get(Servo.class,"swingbar");
-        odo = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
-        odo.resetPosAndIMU();
 
-        distance.setMode(DigitalChannel.Mode.INPUT);
+        ballTransfer = hardwareMap.get(CRServo.class, "ballTransfer");
+
+        limelight = hardwareMap.get(Limelight3A.class,"limelight");
+        angle.setPosition(.656);
+
+
+
         shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         shooter2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
@@ -81,7 +82,8 @@ public class TeleOp extends LinearOpMode {
         shooter.setDirection(DcMotor.Direction.FORWARD);
         shooter2.setDirection(DcMotor.Direction.REVERSE);
         turret.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        odo.resetPosAndIMU();
+        turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
 
 
 
@@ -90,6 +92,8 @@ public class TeleOp extends LinearOpMode {
         runtime.reset();
 
         while (opModeIsActive()){
+            shooter.setVelocity(1100);
+            shooter2.setVelocity(1100);
             driveTrain();
             intakeControl();
             angleManualOverride();
@@ -143,15 +147,13 @@ public class TeleOp extends LinearOpMode {
         double rpm = (shooter.getVelocity() / 28.0) * 60.0;
         return rpm >= SHOOTER_MIN_RPM;
     }
-    public boolean intakeControl() {
-        boolean stateHigh = distance.getState();
-        boolean detected = stateHigh;
-        boolean shooterReady = shooterRunning();
+    public void intakeControl() {
+
 
         if (gamepad1.left_bumper) {
             intake.setPower(0);
         } else if (gamepad1.right_bumper) {
-            intake.setPower(-1);
+            intake.setPower(-.5);
         } else if (gamepad1.y) {
             intake.setPower(1);
         }
@@ -161,89 +163,59 @@ public class TeleOp extends LinearOpMode {
             intake.setPower(-1);
         } else if (gamepad2.left_bumper) {
             ballTransfer.setPower(0.5);
+        } else if (gamepad1.right_trigger > .1) {
+            ballTransfer.setPower(-0.5);
+            intake.setPower(-1);
+        } else if (gamepad1.left_trigger > .1) {
+            ballTransfer.setPower(0.5);
+            intake.setPower(-1);
+
         } else {
             ballTransfer.setPower(0);
         }
 
-        if (gamepad2.dpad_left) {
-            swingbar.setPosition(.1);
-        } else if (gamepad2.dpad_right) {
-            swingbar.setPosition(0);
-        }
 
-        telemetry.addData("Ball Detected", detected);
-
-
-        return stateHigh;
     }
     public void shooterControl(){
-            // ---- Constants ----
-            final double COUNTS_PER_REV = 28;
-            final double MIN_RPM = 2400;
+        if(gamepad2.left_trigger<0.5){
+            shooter.setVelocity(shooter.getVelocity()+.003);
+            shooter2.setVelocity(shooter2.getVelocity()+.003);
+        } else if (gamepad2.right_trigger<.5) {
+            shooter.setVelocity(shooter.getVelocity()-.003);
+            shooter2.setVelocity(shooter2.getVelocity()-.003);
+
+        }
+        // ---- Constants ----
+        targetRPM = 2500;
+
+        // ---- STOP shooter ----
+        if (gamepad2.x) {
+            targetRPM = 0;
+            shooter.setPower(0);
+            shooter2.setPower(0);
+            filteredRPM = 0;
+            return;
+        }
+
+        // ---- Get Limelight result safely ----
 
 
-            final double MAX_RPM = 2920;
+        // ---- Select RPM mode ----
+        if (gamepad2.a) {
+            targetRPM = 2400;
+        }
+        else if (gamepad2.b) {
+            shooter.setVelocity(1500);
+            shooter2.setVelocity(1500);
+        }
 
-            // ---- STOP shooter ----
-            if (gamepad2.x) {
-                targetRPM = 0;
-                shooter.setPower(0);
-                shooter2.setPower(0);
-                filteredRPM = 0;
-                return;
-            }
 
-            // ---- Get Limelight result safely ----
-            LLResult result = limelight.getLatestResult();
-            boolean hasTarget = (result != null && result.isValid());
+        // ---- Telemetry ----
 
-            // ---- Select RPM mode ----
-            if (gamepad2.a) {
-                // Close preset
-                targetRPM = 2400;
-            }
-            else if (gamepad2.b) {
-                // Far preset
-                targetRPM = 2990;
-            }
-            else if (hasTarget) {
-                // Limelight auto RPM
-                double ty = result.getTy();
-                targetRPM = (m * ty) + b;
-            }
-            else {
-                // No target, no preset → idle
-                targetRPM = 0;
-            }
-
-            // ---- Clamp RPM ----
-            targetRPM = Math.max(MIN_RPM, Math.min(MAX_RPM, targetRPM));
-
-            // ---- Smooth RPM ----
-            filteredRPM += rpmAlpha * (targetRPM - filteredRPM);
-
-            // ---- Convert RPM → ticks/sec ----
-            double ticksPerSecond = (filteredRPM / 60.0) * COUNTS_PER_REV;
-
-            shooter.setVelocity(ticksPerSecond);
-            shooter2.setVelocity(ticksPerSecond);
-
-            // ---- Actual RPM (for logic + telemetry) ----
-            double currentRPM = (shooter.getVelocity() / COUNTS_PER_REV) * 60.0;
-
-            // ---- Distance sensor (beam break usually inverted) ----
-            boolean ballDetected = !distance.getState();
-
-            // ---- LEDs ----
-            pwmLight.setPosition(ballDetected ? 0.0 : 0.5);
-
-            // ---- Telemetry ----
-            telemetry.addData("Target RPM", targetRPM);
-            telemetry.addData("Shooter RPM", currentRPM);
-            telemetry.addData("Limelight", hasTarget ? "Locked" : "No Target");
+        telemetry.addData("Voltage", hardwareMap.voltageSensor.iterator().next().getVoltage());
     }
     public void turretControl(){
-        turret.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
         LLResult result = limelight.getLatestResult();
         double tx = 0;
         double ta = 0;
@@ -287,7 +259,7 @@ public class TeleOp extends LinearOpMode {
         double turnPower = (kP * error) + (kI * integral) + (kD * derivative);
 
 // Clamp power to avoid excessive speed
-        turnPower = Math.max(-.9, Math.min(.9, turnPower));
+        turnPower = Math.max(-1, Math.min(1, turnPower));
 
 // Stop condition: target centered and close enough
         if (Math.abs(error) < 0.1 && ta > .4) {
@@ -299,26 +271,20 @@ public class TeleOp extends LinearOpMode {
     }
     public void angleManualOverride(){
         if (gamepad2.dpad_down){
-            angle.setPosition(angle.getPosition()+.001);
+            angle.setPosition(angle.getPosition()+.003);
         }
         else if (gamepad2.dpad_up){
-            angle.setPosition(angle.getPosition()-.001);
+            angle.setPosition(angle.getPosition()-.003);
         }
         if (gamepad2.y){
             angle.setPosition(.656);
         }
         else if (gamepad2.a) {
-            angle.setPosition(.556);
+            angle.setPosition(.656);
         }
     }
     public void turretManualOverride() {
-       // if (gamepad1.x){
-            //Snap Control
-           //turret.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-            //turret.setTargetPosition((int) targetPos);
-            //turret.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-            //turret.setPower(0.6); // adjust speed
-        //}
+
         if (Math.abs(gamepad2.left_stick_x) > 0.15) {
             turret.setPower(gamepad2.left_stick_x);
         }
@@ -331,8 +297,21 @@ public class TeleOp extends LinearOpMode {
         if (gamepad1.options && gamepad1.share) {
             terminateOpModeNow();
         }
-        if (timeLeft < 10) {
-            pwmLight2.setPosition(.611);
-        }
 
-    }}
+
+
+    }
+
+    public void dashboard(){
+        TelemetryPacket packet = new TelemetryPacket();
+        Canvas field = packet.fieldOverlay();
+
+
+
+// Send packet
+        dashboard.sendTelemetryPacket(packet);
+
+
+    }
+    }
+
