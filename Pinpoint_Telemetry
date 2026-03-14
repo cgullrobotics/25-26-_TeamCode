@@ -1,0 +1,51 @@
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.GoBildaPinpointDriver;
+
+@TeleOp(name="Pinpoint_Telemetry")
+public class Pinpoint_Telemetry extends LinearOpMode {
+
+    private GoBildaPinpointDriver odo;
+
+    @Override
+    public void runOpMode() throws InterruptedException {
+
+        // Initialize Pinpoint
+        odo = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+        odo.resetPosAndIMU();
+
+        telemetry.addLine("Pinpoint Initialized");
+        telemetry.update();
+        odo.setOffsets(5, 4); // or your actual pod offsets
+        odo.setEncoderDirections(
+                GoBildaPinpointDriver.EncoderDirection.FORWARD,
+                GoBildaPinpointDriver.EncoderDirection.FORWARD
+        );
+        waitForStart();
+
+        while (opModeIsActive()) {
+
+            // Update odometry
+            odo.update();
+
+            // Get X, Y, heading
+            double x = odo.getPosX(DistanceUnit.INCH);
+            double y = odo.getPosY(DistanceUnit.INCH);
+            double heading = odo.getHeading(AngleUnit.DEGREES); // in degrees
+
+            // Display
+            telemetry.addData("X (INCH)", "%.2f", x);
+            telemetry.addData("Y (INCH)", "%.2f", y);
+            telemetry.addData("Heading (deg)", "%.2f", heading);
+            telemetry.update();
+        }
+    }
+}
