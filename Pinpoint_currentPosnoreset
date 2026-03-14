@@ -1,0 +1,36 @@
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
+
+@Autonomous(name="Pinpoint_currentPosnoreset")
+public class Pinpoint_currentPosnoreset extends LinearOpMode{
+    GoBildaPinpointDriver pinpoint;
+
+    @Override
+    public void runOpMode() throws InterruptedException {
+        pinpoint = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+        pinpoint.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_4_BAR_POD);
+        pinpoint.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD, GoBildaPinpointDriver.EncoderDirection.FORWARD);
+        pinpoint.initialize();
+        pinpoint.update();
+
+        waitForStart();
+        while (opModeIsActive()) {
+            pinpoint.update();
+            Pose2D pose = pinpoint.getPosition();
+            double x = pose.getX(DistanceUnit.CM);
+            double y = pose.getY(DistanceUnit.CM);
+            double heading = pose.getHeading(AngleUnit.DEGREES);
+
+            telemetry.update();
+            telemetry.addData("Current X", x);
+            telemetry.addData("Current Y", y);
+            telemetry.addData("Heading", heading);
+        }
+    }
+}
