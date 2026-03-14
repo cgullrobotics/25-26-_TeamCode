@@ -7,7 +7,7 @@ import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-@TeleOp(name = "telemetry")
+@TeleOp(name = "telemetrywithresetencoders")
 
 public class telemetrywithresetencoders extends LinearOpMode{
     private DcMotor leftFront, intake, leftback, rightFront, rightBack, shooter, turret;
