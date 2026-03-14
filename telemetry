@@ -8,6 +8,9 @@ import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.Servo;
 
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose3D;
+
 @TeleOp(name = "telemetry")
 
 public class telemetry extends LinearOpMode{
@@ -16,6 +19,10 @@ public class telemetry extends LinearOpMode{
     private CRServo ballTransfer;
     GoBildaPinpointDriver pinpoint;
     private Limelight3A limelight;
+    double robotX = 0;
+    double robotY = 0;
+    double robotHeading = 0;
+
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -58,22 +65,24 @@ public class telemetry extends LinearOpMode{
 
     }
     public void limelight(){
+
+
         LLResult result = limelight.getLatestResult();
-        double tx = 0;
-        double ta = 0;
-        double targetArea = 0;
 
-        if (result !=null&& result.isValid()){
-            tx = result.getTx();
-            double ty = result.getTy();
-            ta = result.getTa();
+        if(result != null && result.isValid()){
 
-            telemetry.addData("Target X", tx);
-            telemetry.addData("Target Y", ty);
-            telemetry.addData("Target Area", ta);
+            Pose3D botPose = result.getBotpose();
 
-        } else {
-            telemetry.addData("limelight","No targets");
+            robotX = botPose.getPosition().toUnit(DistanceUnit.INCH).x;
+            robotY = botPose.getPosition().toUnit(DistanceUnit.INCH).y;
+
+            robotHeading = botPose.getOrientation().getYaw();
+
         }
+
+        telemetry.addData("Robot X", robotX);
+        telemetry.addData("Robot Y", robotY);
+        telemetry.addData("Heading", robotHeading);
     }
-}
+    }
+
